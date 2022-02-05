@@ -6,8 +6,5 @@ server:
     address: ":8082"
     debug_headers: true
     debug_body: true
-okta_app:
-    client_id: {CLIENT_ID}
-    client_secret: {CLIENT_SECRET}
-    issuer: https://{DOMAIN}.okta.com/oauth2/default
-    redirect_uri: http://localhost:8082/code
+scim:
+    enable_groups: true

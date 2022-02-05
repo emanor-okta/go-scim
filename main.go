@@ -9,7 +9,6 @@ import (
 	v2 "github.com/emanor-okta/go-scim/types/v2"
 	"github.com/go-redis/redis/v8"
 
-	"github.com/emanor-okta/go-scim/filters"
 	"github.com/emanor-okta/go-scim/server"
 	"github.com/emanor-okta/go-scim/types/v2/extension"
 	"github.com/emanor-okta/go-scim/utils"
@@ -39,7 +38,8 @@ func main() {
 		log.Fatalf("Marshal error: %v\n", err)
 	}
 	fmt.Println(string(j))
-	// utils.Test(j)
+	utils.Test(j)
+	// utils.Test2()
 
 	var u v2.User
 	if err = json.Unmarshal(j, &u); err != nil {
@@ -63,7 +63,13 @@ func main() {
 	/*
 	 * Set Filters
 	 */
-	server.TestFilter = filters.TestReqFilter{}
+	// testFilter := filters.TestReqFilter{}
+	// server.UsersPostReqFilter = testFilter
+	// server.UsersPostResFilter = testFilter
+	// server.UsersPutReqFilter = testFilter
+	// server.UsersPutResFilter = testFilter
+	// server.UsersPatchReqFilter = testFilter
+	// server.UsersPatchResFilter = testFilter
 
 	server.StartServer(config)
 }

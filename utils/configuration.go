@@ -18,6 +18,9 @@ type Configuration struct {
 		Debug_headers bool
 		Debug_body    bool
 	}
+	Scim struct {
+		Enable_groups bool
+	}
 }
 
 func LoadConfig(c string) *Configuration {

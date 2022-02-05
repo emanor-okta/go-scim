@@ -14,18 +14,28 @@ import (
 const (
 	NOT_FOUND           = "not_found"
 	USER_ALREADY_EXISTS = "User already exists in the database."
+	GROUPALREADY_EXISTS = "Group already exists in the database."
 )
 
 var debugHeaders bool
 var debugBody bool
+var enableGroups bool
 
 func StartServer(config *utils.Configuration) {
 	debugHeaders = config.Server.Debug_headers
 	debugBody = config.Server.Debug_body
+	enableGroups = config.Scim.Enable_groups
 	log.Printf("starting server at %v\n", config.Server.Address)
 
 	http.HandleFunc("/scim/v2/Users", handleUsers)
 	http.HandleFunc("/scim/v2/Users/", handleUser)
+	http.HandleFunc("/scim/v2/Groups", handleGroups)
+	http.HandleFunc("/scim/v2/Groups/", handleGroup)
+
+	http.HandleFunc("/scim/v1/Users", handleUsers)
+	http.HandleFunc("/scim/v1/Users/", handleUser)
+	http.HandleFunc("/scim/v1/Groups", handleGroups)
+	http.HandleFunc("/scim/v1/Groups/", handleGroup)
 
 	if err := http.ListenAndServe(config.Server.Address, nil); err != nil {
 		log.Fatalf("Server startup failed: %s\n", err)
@@ -43,50 +53,18 @@ func printHeaders(req *http.Request) {
 
 func printBody(body []byte) {
 	log.Println("> Request Body")
-	// if err := req.ParseForm(); err != nil {
-	// 	log.Printf("Error parsing Form Data: %v\n", err)
-	// 	return
-	// }
-
-	// var m map[string]interface{}
-	// if err := json.NewDecoder(req.Body).Decode(&m); err != nil {
-	// 	log.Printf("Error decoding Json Data: %v\n", err)
-	// 	return
-	// }
-	// fmt.Println(m)
-	// bytes, err := json.MarshalIndent(body, "", "  ")
-	// if err != nil {
-	// 	log.Printf("Error marshalling Json Data: %v\n", err)
-	// 	return
-	// }
 	fmt.Println(string(body))
-
-	// fmt.Println(req.PostForm)
 	fmt.Println("")
 }
 
-func getBody(req *http.Request) ( /*map[string]interface{},*/ []byte, error) {
+func getBody(req *http.Request) ([]byte, error) {
 	b, err := io.ReadAll(req.Body)
 	if err != nil {
 		log.Printf("Error reading Json Data: %v\n", err)
 		return nil, err
 	}
+
 	defer req.Body.Close()
-
-	// var m map[string]interface{}
-	// if err := json.Unmarshal(b, &m); err != nil {
-	// 	// if err := json.NewDecoder(s).Decode(&m); err != nil {
-	// 	log.Printf("Error decoding Json Data: %v\n", err)
-	// 	return nil, nil, err
-	// }
-	// fmt.Println(m)
-
-	// bytes, err := json.MarshalIndent(&m, "", "  ")
-	// bytes, err := json.Marshal(&m)
-	// if err != nil {
-	// 	log.Printf("Error marshalling Json Data: %v\n", err)
-	// 	return nil, nil, err
-	// }
 	return b, nil
 }
 
@@ -105,6 +83,23 @@ func buildListResponse(docs []interface{}) v2.ListResponse {
 		var m map[string]interface{}
 		json.Unmarshal([]byte(fmt.Sprintf("%v", v)), &m)
 		lr.Resources = append(lr.Resources, m)
+	}
+	return lr
+}
+
+func buildGroupListResponse(groups []map[string]interface{}) v2.ListResponse {
+	lr := v2.ListResponse{}
+	lr.Schemas = append(lr.Schemas, v2.LIST_SCHEMA)
+	lr.StartIndex = 1
+	lr.TotalResults = len(groups)
+	lr.ItemsPerPage = lr.TotalResults
+	lr.Resources = []interface{}{}
+
+	for _, v := range groups {
+		if v == nil {
+			continue
+		}
+		lr.Resources = append(lr.Resources, v)
 	}
 	return lr
 }
