@@ -44,7 +44,7 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 		} else {
 			// ?startIndex=<?>&count=<?>
 			var err error
-			docs, err = utils.GetUsers(q.startIndex, q.count)
+			docs, err = utils.GetUsersByRange(q.startIndex, q.count)
 			if err != nil {
 				handleEmptyListReturn(&res, err)
 				return
@@ -178,17 +178,18 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 		}
 
 		if req.Method == http.MethodPut {
-			// PUT !! Dont bother with groups since Okta sends all add/remove via the /groups endpoint !!
 			if UsersPutReqFilter != nil {
 				b = UsersPutReqFilter.UserIdPutRequest(b)
 			}
 
 			var m map[string]interface{}
 			json.Unmarshal(b, &m)
+			ids, groups := buildGroupsMembersList(m["groups"].([]interface{}))
 			m["groups"] = []interface{}{}
 			u, _ := json.Marshal(m)
+			userElement := fmt.Sprintf(`{"display":"%v","value":"%v"}`, m["userName"], uuid)
 
-			if err := utils.UpdateDoc(uuid, u); err != nil {
+			if err := utils.UpdateUser(uuid, u, m["active"].(bool), userElement, ids, groups); err != nil {
 				handleErrorForKeyLookup(&res, err)
 				return
 			}

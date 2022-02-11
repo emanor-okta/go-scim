@@ -20,6 +20,7 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 
 	if req.Method == http.MethodGet {
 		// GET
+		var grps interface{}
 		q := getQuery(req.URL.Query())
 		debugQueryParams(&q)
 		if q.filter.displayName != "" {
@@ -29,43 +30,28 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 				handleEmptyListReturn(&res, err)
 				return
 			}
-
-			var m map[string]interface{}
-			json.Unmarshal([]byte(g), &m)
-			getGroupMembers([]map[string]interface{}{m})
-			lr := buildGroupListResponse([]map[string]interface{}{m})
-			j, _ := json.Marshal(&lr)
-
-			res.WriteHeader(http.StatusOK)
-			res.Write(j)
+			grps = []interface{}{g}
 		} else {
 			// ?startIndex=<?>&count=<?>
-			docs, err := utils.GetGroups(q.startIndex, q.count)
+			var err error
+			grps, err = utils.GetGroupsByRange(q.startIndex, q.count)
 			if err != nil {
 				log.Printf("\n%v\n\n", err)
 				handleEmptyListReturn(&res, err)
 				return
 			}
-
-			groups := make([]map[string]interface{}, len(docs))
-			for i, v := range docs {
-				err = json.Unmarshal([]byte(v.(string)), &groups[i])
-				if err != nil {
-					log.Printf("Error Unmarshalling group: %v\n", err)
-				}
-				// getGroupMembers(groups[i])
-			}
-			getGroupMembers(groups)
-
-			lr := buildGroupListResponse(groups)
-			j, err := json.Marshal(&lr)
-			if err != nil {
-				log.Fatalf("Error Marshalling ListResponse: %v\n", err)
-			}
-			fmt.Println(string(j))
-			res.WriteHeader(http.StatusOK)
-			res.Write(j)
 		}
+
+		groups := embedGroupsMembers(grps)
+		lr := buildListResponse(groups)
+		j, err := json.Marshal(&lr)
+		if err != nil {
+			log.Fatalf("Error Marshalling ListResponse: %v\n", err)
+		}
+		fmt.Println(string(j))
+		res.WriteHeader(http.StatusOK)
+		res.Write(j)
+
 	} else if req.Method == http.MethodPost {
 		// POST
 		b, err := getBody(req)
@@ -83,6 +69,7 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
+		// TODO - SHOULD REMOVE THIS CHECK and make the AddGroup call fail if GROUP Already Exists
 		if _, err = utils.GetGroupByFilter(m["displayName"].(string)); err == nil {
 			// group already exist return 409
 			handleErrorResponse(&res, GROUPALREADY_EXISTS, http.StatusConflict)
@@ -98,7 +85,7 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 		// 	doc = UsersPostReqFilter.UserPostRequest(doc)
 		// }
 
-		ids, mems := buildGroupMembersList(m["members"].([]interface{}))
+		ids, mems := buildGroupsMembersList(m["members"].([]interface{}))
 
 		b, _ = json.Marshal(m)
 		m["members"] = []interface{}{}
@@ -150,21 +137,15 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 		res.Write(nil)
 	} else if req.Method == http.MethodGet {
 		// GET
-		doc, err := utils.GetDoc(uuid)
+		grp, err := utils.GetGroupByUUID(uuid)
 		if err != nil {
 			handleErrorForKeyLookup(&res, err)
 			return
 		}
-		fmt.Println(doc)
-		var m map[string]interface{}
-		if err = json.Unmarshal([]byte(doc), &m); err != nil {
-			log.Printf("Error json.Unmarshall: %v\n\n", err)
-		}
-		getGroupMembers([]map[string]interface{}{m})
-		j, _ := json.Marshal(&m)
 
+		groups := embedGroupsMembers([]interface{}{grp})
 		res.WriteHeader(http.StatusOK)
-		res.Write(j)
+		res.Write([]byte(groups[0].(string)))
 	} else {
 		b, err := getBody(req)
 		if err != nil {
@@ -191,7 +172,7 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 			m["meta"] = meta
 			m["id"] = uuid
 
-			ids, mems := buildGroupMembersList(m["members"].([]interface{}))
+			ids, mems := buildGroupsMembersList(m["members"].([]interface{}))
 
 			b, _ = json.Marshal(m)
 			m["members"] = []interface{}{}
@@ -221,7 +202,7 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 			// 	UsersPatchReqFilter.UserIdPatchRequest(&ops)
 			// }
 
-			// process list of operations
+			// process list of operations  ** TODO - Should this be run in a single transaction ?? **
 			for _, o := range ops.Operations {
 				if o.Op == v2.GROUP_ADD {
 					var a []string
@@ -243,7 +224,7 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 				} else if o.Op == v2.GROUP_REPLACE {
 					if o.Path == v2.GROUP_PATH_MEMBERS {
 						// replace all group members
-						ids, members := buildGroupMembersList(o.Value.([]interface{}))
+						ids, members := buildGroupsMembersList(o.Value.([]interface{}))
 						if err := utils.ReplaceGroupMembers(uuid, ids, members); err != nil {
 							handleErrorResponse(&res, err.Error(), http.StatusInternalServerError)
 							return
@@ -271,43 +252,47 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func getGroupMembers(group []map[string]interface{}) {
-	var ids []string
-	for _, v := range group {
-		ids = append(ids, v["id"].(string))
-	}
+// CAN DELETE
+// func getGroupMembers(group []map[string]interface{}) {
+// 	var ids []string
+// 	for _, v := range group {
+// 		ids = append(ids, v["id"].(string))
+// 	}
 
-	result, err := utils.GetGroupMembers(ids)
-	if err != nil {
-		return
-	}
+// 	result, err := utils.GetGroupMembers(ids)
+// 	if err != nil {
+// 		return
+// 	}
 
-	for i, v := range result.([]interface{}) {
-		if len(v.([]interface{})) == 0 {
-			continue
-		}
+// 	for i, v := range result.([]interface{}) {
+// 		if len(v.([]interface{})) == 0 {
+// 			continue
+// 		}
 
-		var b strings.Builder
-		b.WriteString("[")
-		for i_, v_ := range v.([]interface{}) {
-			if i_ > 0 {
-				b.WriteString(",")
-			}
-			fmt.Println(v_)
-			b.WriteString(v_.(string))
-		}
-		b.WriteString("]")
-		fmt.Printf("groups: %v\n\n", b.String())
-		var j interface{}
-		if err = json.Unmarshal([]byte(b.String()), &j); err != nil {
-			fmt.Printf("Error groupHandlers.getGroupMembers Unmarshall error: %v\n", err)
-			continue
-		}
-		group[i]["members"] = j
-	}
-}
+// 		var b strings.Builder
+// 		b.WriteString("[")
+// 		for i_, v_ := range v.([]interface{}) {
+// 			if i_ > 0 {
+// 				b.WriteString(",")
+// 			}
+// 			b.WriteString(v_.(string))
+// 		}
 
-func buildGroupMembersList(a []interface{}) ([]string, []string) {
+// 		b.WriteString("]")
+// 		// fmt.Printf("groups: %v\n\n", b.String())
+// 		var j interface{}
+// 		if err = json.Unmarshal([]byte(b.String()), &j); err != nil {
+// 			fmt.Printf("Error groupHandlers.getGroupMembers Unmarshall error: %v\n", err)
+// 			continue
+// 		}
+// 		group[i]["members"] = j
+// 	}
+// }
+
+/*
+	Used by both Group/User requests to prepare either a list of members or groups to send to Redis
+*/
+func buildGroupsMembersList(a []interface{}) ([]string, []string) {
 	mems := []string{}
 	ids := []string{}
 	for _, g := range a {
@@ -317,4 +302,24 @@ func buildGroupMembersList(a []interface{}) ([]string, []string) {
 		ids = append(ids, g["value"].(string))
 	}
 	return ids, mems
+}
+
+func embedGroupsMembers(docs interface{}) []interface{} {
+	var groups []interface{}
+	for _, v := range docs.([]interface{}) {
+		group := v.([]interface{})[0].(string)
+		var b strings.Builder
+		b.WriteString(`"members":[`)
+		for i := 1; i < len(v.([]interface{})); i++ {
+			if i > 1 {
+				b.WriteString(",")
+			}
+			b.WriteString(v.([]interface{})[i].(string))
+		}
+
+		b.WriteString("]")
+		group = strings.Replace(group, `"members":[]`, b.String(), 1)
+		groups = append(groups, group)
+	}
+	return groups
 }

@@ -14,8 +14,6 @@ import (
 // docker run --name go-scim-redis -p 6379:6379 -d redis redis-server --save 60 1 --loglevel warning
 // docker exec -i go-scim-redis bash (cd /usr/local/bin)
 
-// DEL_GROUP_CMD             = "redis.call('del',KEYS[1]);redis.call('HDel',KEYS[2],ARGV[1]);redis.call('LRem',KEYS[3],0,ARGV[2]);redis.call('Del',KEYS[4]);redis.call('HDel',KEYS[5],ARGV[2]);return 1;"
-
 const (
 	USERS_KEY                 = "_users"
 	GROUPS_KEY                = "_groups"
@@ -23,11 +21,13 @@ const (
 	USERS_REVERSE_LOOKUP_KEY  = "_users_reverse_lookup"
 	GROUPS_LOOKUP_KEY         = "_groups_lookup"
 	GROUPS_REVERSE_LOOKUP_KEY = "_groups_reverse_lookup"
-	ADD_USER_CMD              = "redis.call('set', KEYS[1], ARGV[1]); redis.call('HSet', KEYS[2], ARGV[2], ARGV[3]); redis.call('LPush', KEYS[3], ARGV[3]); return 1;"
-	DEL_USER_CMD              = "redis.call('del', KEYS[1]); redis.call('HDel', KEYS[2], ARGV[1]); redis.call('LRem', KEYS[3], 0, ARGV[2]); return 1;"
-	DEL_GROUP_CMD             = `local n = redis.call('HGet',KEYS[1],ARGV[1]); local m = redis.call('HKeys',KEYS[2]); for k,v in ipairs(m) do redis.call('HDel',v.."_groups",ARGV[1]); end; redis.call('del',KEYS[3]);redis.call('HDel',KEYS[4],n);redis.call('LRem',KEYS[5],0,ARGV[1]);redis.call('Del',KEYS[2]);redis.call('HDel',KEYS[1],ARGV[1]);return 1;`
-	GROUP_MEMBERS             = "t[%v]=redis.call('HVals',KEYS[%v]);"
-	CHANGE_GROUP_NAME         = "local k=redis.call('HGet',KEYS[1],ARGV[1]);redis.call('HDel',KEYS[2],k);redis.call('HSet',KEYS[1],ARGV[1],ARGV[2]);redis.call('HSet',KEYS[2],ARGV[2],ARGV[1]);redis.call('Set',KEYS[3],ARGV[3]);return 1;"
+	EMBEDDED_MEMBERS          = "_members"
+	EMBEDDED_GROUPS           = "_groups"
+	// ADD_USER_CMD              = "redis.call('set', KEYS[1], ARGV[1]); redis.call('HSet', KEYS[2], ARGV[2], ARGV[3]); redis.call('LPush', KEYS[3], ARGV[3]); return 1;"
+	// DEL_USER_CMD = "redis.call('del', KEYS[1]); redis.call('HDel', KEYS[2], ARGV[1]); redis.call('LRem', KEYS[3], 0, ARGV[2]); return 1;"
+	// DEL_GROUP_CMD             = `local n = redis.call('HGet',KEYS[1],ARGV[1]); local m = redis.call('HKeys',KEYS[2]); for k,v in ipairs(m) do redis.call('HDel',v.."_groups",ARGV[1]); end; redis.call('del',KEYS[3]);redis.call('HDel',KEYS[4],n);redis.call('LRem',KEYS[5],0,ARGV[1]);redis.call('Del',KEYS[2]);redis.call('HDel',KEYS[1],ARGV[1]);return 1;`
+	// GROUP_MEMBERS = "t[%v]=redis.call('HVals',KEYS[%v]);"
+	// CHANGE_GROUP_NAME = "local k=redis.call('HGet',KEYS[1],ARGV[1]);redis.call('HDel',KEYS[2],k);redis.call('HSet',KEYS[1],ARGV[1],ARGV[2]);redis.call('HSet',KEYS[2],ARGV[2],ARGV[1]);redis.call('Set',KEYS[3],ARGV[3]);return 1;"
 )
 
 type UserPatch struct {
@@ -37,9 +37,22 @@ type UserPatch struct {
 	PasswordValue string
 }
 
-// eval "local l=''; local k2=redis.call('HKeys',KEYS[1]);for k,v in ipairs(k2) do redis.call('Del',v); end return l;" 1 0c675e46-5655-4144-97f3-0b3a021cadaa_members
+type LuaScriptSHA struct {
+	LuaGetByRange          string
+	LuaGetByFilter         string
+	LuaGetByUUID           string
+	LuaAddUser             string
+	LuaUpdateUuserActive   string
+	LuaUpdateUuserInActive string
+	LuaDeleteUser          string
+	LuaPatchUser           string
+	LuaDeleteGroup         string
+	LuaUpdateGroupName     string
+}
+
 var rdb *redis.Client
 var ctx context.Context = context.Background()
+var luaScripts LuaScriptSHA
 
 func InitializeRedis(config *Configuration) error {
 	rdb = redis.NewClient(&redis.Options{
@@ -54,17 +67,37 @@ func InitializeRedis(config *Configuration) error {
 		return intCmd.Err()
 	}
 
+	luaScripts.LuaGetByRange = loadLuaScriptIntoCache(LUA_GET_BY_RANGE)
+	luaScripts.LuaGetByFilter = loadLuaScriptIntoCache(LUA_GET_BY_FILTER)
+	luaScripts.LuaGetByUUID = loadLuaScriptIntoCache(LUA_GET_BY_UUID)
+	luaScripts.LuaAddUser = loadLuaScriptIntoCache(LUA_ADD_USER)
+	luaScripts.LuaUpdateUuserActive = loadLuaScriptIntoCache(LUA_UPDATE_USER_ACTIVE)
+	luaScripts.LuaUpdateUuserInActive = loadLuaScriptIntoCache(LUA_UPDATE_USER_INACTIVE)
+	luaScripts.LuaDeleteUser = loadLuaScriptIntoCache(LUA_DELETE_USER)
+	luaScripts.LuaPatchUser = loadLuaScriptIntoCache(LUA_PATCH_USER)
+	luaScripts.LuaDeleteGroup = loadLuaScriptIntoCache(LUA_DELETE_GROUP)
+	luaScripts.LuaUpdateGroupName = loadLuaScriptIntoCache(LUA_UPDATE_GROUP_NAME)
+
 	return nil
 }
 
-func SaveDoc(key string, doc interface{}) error {
-	err := rdb.Set(ctx, key, doc, 0).Err()
-	if err != nil {
-		log.Printf("Redis Error Saving, Key: %v, error: %v\n\n", key, err)
-		return err
+func loadLuaScriptIntoCache(script string) string {
+	result := rdb.ScriptLoad(ctx, script)
+	if result.Err() != nil {
+		log.Fatalf("Error loading Lua Script into redis..\nscript: %v\nerror: %v\n\n", script, result.Err().Error())
 	}
-	return nil
+
+	return result.Val()
 }
+
+// func SaveDoc(key string, doc interface{}) error {
+// 	err := rdb.Set(ctx, key, doc, 0).Err()
+// 	if err != nil {
+// 		log.Printf("Redis Error Saving, Key: %v, error: %v\n\n", key, err)
+// 		return err
+// 	}
+// 	return nil
+// }
 
 func UpdateDoc(key string, doc interface{}) error {
 	args := redis.SetArgs{Mode: "XX"}
@@ -79,177 +112,114 @@ func UpdateDoc(key string, doc interface{}) error {
 	return nil
 }
 
-func GetDoc(key string) (string, error) {
-	doc, err := rdb.Get(ctx, key).Result()
-	if err != nil {
-		if err != redis.Nil {
-			log.Printf("Redis Error Getting, Key: %v, error: %v\n\n", key, err)
-			return "", err
-		}
-		return "", errors.New("not_found")
-	}
-	return doc, nil
-}
-
-func AddLookup(user, uuid string) error {
-	if err := rdb.HSet(ctx, USERS_LOOKUP_KEY, user, uuid).Err(); err != nil {
-		log.Printf("Redis Error Adding Lookup, User: %v, UUID: %v, error: %v\n\n", user, uuid, err)
-		return err
-	}
-	return nil
-}
-
-func ListPush(key, value string) error {
-	if err := rdb.LPush(ctx, key, value).Err(); err != nil {
-		log.Printf("Redis Error Pushing to List: %s for: %v, err: %v\n\n", key, value, err)
-		return err
-	}
-	return nil
-}
-
-func lRange(key string, startIndex, count int) ([]string, error) {
-	docs, err := rdb.LRange(ctx, key, int64(startIndex-1), int64(startIndex+count-2)).Result()
-	if err != nil {
-		log.Printf("Redis Error LRange: %s, err: %v\n\n", key, err)
-		return nil, err
-	}
-	return docs, nil
-}
-
-func getByFilter(search, lookupKey string) (string, error) {
-	uuid, err := rdb.HGet(ctx, lookupKey, search).Result()
-	if err != nil {
-		if err != redis.Nil {
-			log.Printf("Redis Error Getting Lookup: %v, error: %v\n\n", search, err)
-			return "", err
-		}
-		return "", errors.New("not_found")
-	}
-	return GetDoc(uuid)
-}
-
-// func getByFilter2(search, lookupKey string) (interface{}, error) {
-// 	fmt.Println(search)
-// 	cmd := `local uuid=redis.call('HGet', KEYS[1],ARGV[1]);if not uuid then return nil; end;local t={};t[1]=redis.call('Get',uuid);local i=2;local l=redis.call('HVals',uuid.."_groups");for k,v in ipairs(l) do t[i]=v;i=i+1;end;return t;`
-// 	// var user []string
-// 	fmt.Println(cmd)
-// 	result, err := rdb.Eval(ctx, cmd, []string{USERS_LOOKUP_KEY}, []string{search}).Result()
+// func GetDoc(key string) (string, error) {
+// 	doc, err := rdb.Get(ctx, key).Result()
 // 	if err != nil {
 // 		if err != redis.Nil {
-// 			log.Printf("Redis Error Getting User by Filter: %s\nerr: %v\n\n", lookupKey, err)
-// 			return nil, err
+// 			log.Printf("Redis Error Getting, Key: %v, error: %v\n\n", key, err)
+// 			return "", err
 // 		}
-// 		return nil, errors.New("not_found")
+// 		return "", errors.New("not_found")
 // 	}
-
-// 	fmt.Println(result)
-// 	return result, nil
-// 	// uuid, err := rdb.HGet(ctx, lookupKey, search).Result()
-// 	// if err != nil {
-// 	// 	if err != redis.Nil {
-// 	// 		log.Printf("Redis Error Getting Lookup: %v, error: %v\n\n", search, err)
-// 	// 		return "", err
-// 	// 	}
-// 	// 	return "", errors.New("not_found")
-// 	// }
-// 	// return GetDoc(uuid)
+// 	return doc, nil
 // }
 
-func getByRange(startIndex, count int, key string) ([]interface{}, error) {
-	ids, err := lRange(key, startIndex, count)
+// func AddLookup(user, uuid string) error {
+// 	if err := rdb.HSet(ctx, USERS_LOOKUP_KEY, user, uuid).Err(); err != nil {
+// 		log.Printf("Redis Error Adding Lookup, User: %v, UUID: %v, error: %v\n\n", user, uuid, err)
+// 		return err
+// 	}
+// 	return nil
+// }
+
+// func ListPush(key, value string) error {
+// 	if err := rdb.LPush(ctx, key, value).Err(); err != nil {
+// 		log.Printf("Redis Error Pushing to List: %s for: %v, err: %v\n\n", key, value, err)
+// 		return err
+// 	}
+// 	return nil
+// }
+
+// func lRange(key string, startIndex, count int) ([]string, error) {
+// 	docs, err := rdb.LRange(ctx, key, int64(startIndex-1), int64(startIndex+count-2)).Result()
+// 	if err != nil {
+// 		log.Printf("Redis Error LRange: %s, err: %v\n\n", key, err)
+// 		return nil, err
+// 	}
+// 	return docs, nil
+// }
+
+// func getByFilterORIG(search, lookupKey string) (string, error) {
+// 	uuid, err := rdb.HGet(ctx, lookupKey, search).Result()
+// 	if err != nil {
+// 		if err != redis.Nil {
+// 			log.Printf("Redis Error Getting Lookup: %v, error: %v\n\n", search, err)
+// 			return "", err
+// 		}
+// 		return "", errors.New("not_found")
+// 	}
+// 	return GetDoc(uuid)
+// }
+
+func getByRange(startIndex int, count int, key, embedded_key string) (interface{}, error) {
+	// cmd := `local ids=redis.call('LRange',KEYS[1],ARGV[1],ARGV[2]);local outer={};local oi=1;for k,id in ipairs(ids) do local inner={};inner[1]=redis.call('Get',id);local i=2;local l=redis.call('HVals',id..KEYS[2]);for k2,v in ipairs(l) do inner[i]=v;i=i+1;end;outer[oi]=inner;oi=oi+1;end;return outer;`
+	// fmt.Println(LUA_GET_BY_RANGE)
+	result, err := rdb.EvalSha(ctx, luaScripts.LuaGetByRange, []string{key, embedded_key}, []string{fmt.Sprintf("%v", startIndex-1), fmt.Sprintf("%v", startIndex-1+count-1)}).Result()
 	if err != nil {
+		log.Printf("Redis Error Getting %v by Range, startIndex: %v, count: %v\nerr: %v\n\n", key, startIndex, count, err)
 		return nil, err
 	}
-	if len(ids) == 0 {
+
+	return result, nil
+}
+
+func getByFilter(name, key, embedded_key string) (interface{}, error) {
+	// cmd := `local uuid=redis.call('HGet', KEYS[1],ARGV[1]);if not uuid then return nil; end;local t={};t[1]=redis.call('Get',uuid);local i=2;local l=redis.call('HVals',uuid..KEYS[2]);for k,v in ipairs(l) do t[i]=v;i=i+1;end;return t;`
+	result, err := rdb.EvalSha(ctx, luaScripts.LuaGetByFilter, []string{key, embedded_key}, []string{name}).Result()
+	if err != nil {
+		if err != redis.Nil {
+			log.Printf("Redis Error Getting by Filter: %s\nerr: %v\n\n", name, err)
+			return nil, err
+		}
 		return nil, errors.New("not_found")
 	}
-	doc, err := rdb.MGet(ctx, ids...).Result()
+
+	return result, nil
+}
+
+func getByUUID(uuid, embedded_key string) (interface{}, error) {
+	// cmd := `local doc=redis.call('Get', KEYS[1]);if not doc then return nil; end;local t={};t[1]=doc;local i=2;local l=redis.call('HVals',KEYS[1]..KEYS[2]);for k,v in ipairs(l) do t[i]=v;i=i+1;end;return t;`
+	result, err := rdb.EvalSha(ctx, luaScripts.LuaGetByUUID, []string{uuid, embedded_key}).Result()
 	if err != nil {
-		log.Printf("Redis Error Getting, MKey: %v, error: %v\n\n", ids, err)
-		return nil, err
+		if err != redis.Nil {
+			log.Printf("Redis Error Getting Document by UUID: %s\nerr: %v\n\n", uuid, err)
+			return nil, err
+		}
+		return nil, errors.New("not_found")
 	}
-	fmt.Println(doc)
-	return doc, nil
+
+	return result, nil
 }
 
 /*
  * User specific functions
  */
 
-/*
-	get user ids - local ids=redis.call('LRange',KEYS[1],ARGV[1],ARGV[2]);
-	define outer map, loop through ids - local o={};local oi=1;for k,uuid in ipairs(ids) do
-	define inner map, get user doc for id - local u={};u[1]=redis.call('Get',uuid);
-	get users groups - local i=2;local l=redis.call('HVals',uuid.."_groups");
-	add each group to structure - for k2,g in ipairs(l) do u[i]=g;i=i+1;end;
-	add user to outer map - o[oi]=u;oi=oi+1;end;
-	return outer - return o;
-*/
-func GetUsers(startIndex int, count int) (interface{}, error) {
-	cmd := `local ids=redis.call('LRange',KEYS[1],ARGV[1],ARGV[2]);local o={};local oi=1;for k,uuid in ipairs(ids) do local u={};u[1]=redis.call('Get',uuid);local i=2;local l=redis.call('HVals',uuid.."_groups");for k2,g in ipairs(l) do u[i]=g;i=i+1;end;o[oi]=u;oi=oi+1;end;return o;`
-	result, err := rdb.Eval(ctx, cmd, []string{USERS_KEY}, []string{fmt.Sprintf("%v", startIndex), fmt.Sprintf("%v", count)}).Result()
-	if err != nil {
-		log.Printf("Redis Error Getting User by Filter: %s\nerr: %v\n\n", USERS_LOOKUP_KEY, err)
-		return nil, err
-	}
-
-	return result, nil
-	// return getByRange(startIndex, count, USERS_KEY)
+func GetUsersByRange(startIndex int, count int) (interface{}, error) {
+	return getByRange(startIndex, count, USERS_KEY, EMBEDDED_GROUPS)
 }
 
-/*
-	get users uuid - local uuid=redis.call('HGet', KEYS[1],ARGV[1]);
-	if not found return nil - if not uuid then return nil; end;
-	add user doc as 1st element - local t={};t[1]=redis.call('Get',uuid);
-	get users groups - local i=2;local l=redis.call('HVals',uuid.."_groups");
-	add each group to structure - for k,v in ipairs(l) do t[i]=v;i=i+1;end;return t;
-*/
 func GetUserByFilter(user string) (interface{}, error) {
-	cmd := `local uuid=redis.call('HGet', KEYS[1],ARGV[1]);if not uuid then return nil; end;local t={};t[1]=redis.call('Get',uuid);local i=2;local l=redis.call('HVals',uuid.."_groups");for k,v in ipairs(l) do t[i]=v;i=i+1;end;return t;`
-	result, err := rdb.Eval(ctx, cmd, []string{USERS_LOOKUP_KEY}, []string{user}).Result()
-	if err != nil {
-		if err != redis.Nil {
-			log.Printf("Redis Error Getting User by Filter: %s\nerr: %v\n\n", user, err)
-			return nil, err
-		}
-		return nil, errors.New("not_found")
-	}
-
-	return result, nil
+	return getByFilter(user, USERS_LOOKUP_KEY, EMBEDDED_GROUPS)
 }
 
-/*
-	get user doc - local u=redis.call('Get', KEYS[1]);
-	if not found return nil - if not u then return nil; end;
-	add user doc as 1st element - local t={};t[1]=u;
-	get users groups - local i=2;local l=redis.call('HVals',KEYS[1].."_groups");
-	add each group to structure - for k,v in ipairs(l) do t[i]=v;i=i+1;end;return t;
-*/
 func GetUserByUUID(uuid string) (interface{}, error) {
-	cmd := `local u=redis.call('Get', KEYS[1]);if not u then return nil; end;local t={};t[1]=u;local i=2;local l=redis.call('HVals',KEYS[1].."_groups");for k,v in ipairs(l) do t[i]=v;i=i+1;end;return t;`
-	result, err := rdb.Eval(ctx, cmd, []string{uuid}).Result()
-	if err != nil {
-		if err != redis.Nil {
-			log.Printf("Redis Error Getting User by UUID: %s\nerr: %v\n\n", uuid, err)
-			return nil, err
-		}
-		return nil, errors.New("not_found")
-	}
-
-	return result, nil
+	return getByUUID(uuid, EMBEDDED_GROUPS)
 }
 
-/*
-	check if user exists - if redis.call('HExists',KEYS[2],ARGV[2]) == 1 then return nil;end;
-	set user doc - redis.call('set', KEYS[1], ARGV[1]);
-	set users lookup - redis.call('HSet', KEYS[2], ARGV[2], ARGV[3]);
-	set users reverse lookup - redis.call('HSet', KEYS[4], ARGV[3], ARGV[2]);
-	add to users list - redis.call('LPush', KEYS[3], ARGV[3]);
-	return success - return 1;
-*/
 func AddUser(doc []byte, userName, uuid string) error {
-	cmd := `if redis.call('HExists',KEYS[2],ARGV[2]) == 1 then return nil;end;redis.call('set', KEYS[1], ARGV[1]);redis.call('HSet', KEYS[2], ARGV[2], ARGV[3]);redis.call('HSet', KEYS[4], ARGV[3], ARGV[2]);redis.call('LPush', KEYS[3], ARGV[3]);return 1;`
-	if err := rdb.Eval(ctx, cmd, []string{uuid, USERS_LOOKUP_KEY, USERS_KEY, USERS_REVERSE_LOOKUP_KEY}, doc, userName, uuid).Err(); err != nil {
+	// cmd := `if redis.call('HExists',KEYS[2],ARGV[2]) == 1 then return nil;end;redis.call('set', KEYS[1], ARGV[1]);redis.call('HSet', KEYS[2], ARGV[2], ARGV[3]);redis.call('HSet', KEYS[4], ARGV[3], ARGV[2]);redis.call('LPush', KEYS[3], ARGV[3]);return 1;`
+	if err := rdb.EvalSha(ctx, luaScripts.LuaAddUser, []string{uuid, USERS_LOOKUP_KEY, USERS_KEY, USERS_REVERSE_LOOKUP_KEY}, doc, userName, uuid).Err(); err != nil {
 		if err != redis.Nil {
 			log.Printf("Redis Error Adding New User: %s\nerr: %v\n\n", doc, err)
 			return err
@@ -259,21 +229,32 @@ func AddUser(doc []byte, userName, uuid string) error {
 	return nil
 }
 
-/*
-	get user name - local n=redis.call('HGet',KEYS[4],ARGV[1]);
-	user not found return - if not n then return nil;end;
-	delete user lookup - redis.call('HDel',KEYS[2],n);
-	delete user reverse lookup - redis.call('HDel',KEYS[4],ARGV[1]);
-	delete user doc - redis.call('Del',KEYS[1]);
-	remove from user list - redis.call('LRem',KEYS[3],0,ARGV[1]);
-	get users groups - local grps=redis.call('HKeys',KEYS[1].."_groups");
-	delete users groups map - redis.call('Del',KEYS[1].."_groups");
-	remove user from each group - for k,v in ipairs(grps) do redis.call('HDel',v.."_members",ARGV[1]);end;
-	return success - return 1;
-*/
-func DelUser(uuid /*, userName*/ string) error {
-	cmd := `local n=redis.call('HGet',KEYS[4],ARGV[1]);if not n then return nil;end;redis.call('HDel',KEYS[2],n);redis.call('HDel',KEYS[4],ARGV[1]);redis.call('Del',KEYS[1]);redis.call('LRem',KEYS[3],0,ARGV[1]);local grps=redis.call('HKeys',KEYS[1].."_groups");redis.call('Del',KEYS[1].."_groups");for k,v in ipairs(grps) do redis.call('HDel',v.."_members",ARGV[1]);end;return 1;`
-	if err := rdb.Eval(ctx, cmd, []string{uuid, USERS_LOOKUP_KEY, USERS_KEY, USERS_REVERSE_LOOKUP_KEY}, uuid /*, userName*/).Err(); err != nil {
+func UpdateUser(uuid string, doc []byte, active bool, userElement string, ids, groups []string) error {
+	var luaScript string
+	args := []interface{}{doc, userElement, len(ids)}
+	if active {
+		luaScript = luaScripts.LuaUpdateUuserActive
+		for i, v := range ids {
+			args = append(args, v)
+			args = append(args, groups[i])
+		}
+	} else {
+		luaScript = luaScripts.LuaUpdateUuserInActive
+	}
+
+	if err := rdb.EvalSha(ctx, luaScript, []string{uuid}, args...).Err(); err != nil {
+		if err != redis.Nil {
+			log.Printf("Redis Error Adding New User: %s\nerr: %v\n\n", doc, err)
+			return err
+		}
+		return errors.New("user_already_exists")
+	}
+	return nil
+}
+
+func DelUser(uuid string) error {
+	// cmd := `local n=redis.call('HGet',KEYS[4],ARGV[1]);if not n then return nil;end;redis.call('HDel',KEYS[2],n);redis.call('HDel',KEYS[4],ARGV[1]);redis.call('Del',KEYS[1]);redis.call('LRem',KEYS[3],0,ARGV[1]);local grps=redis.call('HKeys',KEYS[1].."_groups");redis.call('Del',KEYS[1].."_groups");for k,v in ipairs(grps) do redis.call('HDel',v.."_members",ARGV[1]);end;return 1;`
+	if err := rdb.EvalSha(ctx, luaScripts.LuaDeleteUser, []string{uuid, USERS_LOOKUP_KEY, USERS_KEY, USERS_REVERSE_LOOKUP_KEY}, uuid /*, userName*/).Err(); err != nil {
 		if err != redis.Nil {
 			log.Printf("Redis Error Deleting User: %s\nerr: %v\n\n", uuid, err)
 			return err
@@ -283,24 +264,10 @@ func DelUser(uuid /*, userName*/ string) error {
 	return nil
 }
 
-/*
-	get user doc - local u=redis.call('Get',KEYS[1]);
-	user not found return - if not u then return nil;end;
-	change active if included - if KEYS[2]=="true" then u=string.gsub(u,"\"active\":.-,","\"active\":"..ARGV[1]..",");
-	  if active set to false remove groups - if ARGV[1]=="false" then
-	   get users groups - local grps=redis.call('HKeys',KEYS[1].."_groups");
-	   delete users groups map - redis.call('Del',KEYS[1].."_groups");
-	   remove user from each group - for k,v in ipairs(grps) do redis.call('HDel',v.."_members",KEYS[1]);end;
-	  close if statement for active==false - end;
-	close if statement for change active - end;
-	change password if included - if KEYS[3]=="true" then u=string.gsub(u,"\"password\":\".-\"","\"password\":\""..ARGV[2].."\"");end;
-	save user doc - redis.call('Set',KEYS[1],u);
-	return success - return 1;
-*/
 func PatchUser(uuid string, userPatch UserPatch) error {
-	cmd := `local u=redis.call('Get',KEYS[1]);if not u then return nil;end;if KEYS[2]=="true" then u=string.gsub(u,"\"active\":.-,","\"active\":"..ARGV[1]..",");  if ARGV[1]=="false" then local grps=redis.call('HKeys',KEYS[1].."_groups");redis.call('Del',KEYS[1].."_groups");for k,v in ipairs(grps) do redis.call('HDel',v.."_members",KEYS[1]);end;end;   end;if KEYS[3]=="true" then u=string.gsub(u,"\"password\":\".-\"","\"password\":\""..ARGV[2].."\"");end;redis.call('Set',KEYS[1],u); return 1; `
-	fmt.Println(cmd)
-	if err := rdb.Eval(ctx, cmd, []string{uuid, fmt.Sprintf("%v", userPatch.Active), fmt.Sprintf("%v", userPatch.Password)}, fmt.Sprintf("%v", userPatch.ActiveValue), userPatch.PasswordValue).Err(); err != nil {
+	// cmd := `local u=redis.call('Get',KEYS[1]);if not u then return nil;end;if KEYS[2]=="true" then u=string.gsub(u,"\"active\":.-,","\"active\":"..ARGV[1]..",");  if ARGV[1]=="false" then local grps=redis.call('HKeys',KEYS[1].."_groups");redis.call('Del',KEYS[1].."_groups");for k,v in ipairs(grps) do redis.call('HDel',v.."_members",KEYS[1]);end;end;   end;if KEYS[3]=="true" then u=string.gsub(u,"\"password\":\".-\"","\"password\":\""..ARGV[2].."\"");end;redis.call('Set',KEYS[1],u); return 1; `
+	// fmt.Println(LUA_PATCH_USER)
+	if err := rdb.EvalSha(ctx, luaScripts.LuaPatchUser, []string{uuid, fmt.Sprintf("%v", userPatch.Active), fmt.Sprintf("%v", userPatch.Password)}, fmt.Sprintf("%v", userPatch.ActiveValue), userPatch.PasswordValue).Err(); err != nil {
 		if err != redis.Nil {
 			log.Printf("Redis Error Patching User: %s\nerr: %v\n\n", uuid, err)
 			return err
@@ -313,29 +280,34 @@ func PatchUser(uuid string, userPatch UserPatch) error {
 /*
  * Group specific functions
  */
-func GetGroupByFilter(group string) (string, error) {
-	return getByFilter(group, GROUPS_LOOKUP_KEY)
+
+func GetGroupByFilter(group string) (interface{}, error) {
+	return getByFilter(group, GROUPS_LOOKUP_KEY, EMBEDDED_MEMBERS)
 }
 
-func GetGroups(startIndex int, count int) ([]interface{}, error) {
-	return getByRange(startIndex, count, GROUPS_KEY)
+func GetGroupByUUID(uuid string) (interface{}, error) {
+	return getByUUID(uuid, EMBEDDED_MEMBERS)
 }
 
-func GetGroupMembers(ids []string) (interface{}, error) {
-	var b strings.Builder
-	b.WriteString("local t={};")
-	for i, v := range ids {
-		b.WriteString(fmt.Sprintf(GROUP_MEMBERS, i+1, i+1))
-		ids[i] = fmt.Sprintf("%v_members", v)
-	}
-	b.WriteString("return t;")
-	result, err := rdb.Eval(ctx, b.String(), ids).Result()
-	if err != nil {
-		fmt.Printf("\n\nError redis.GetGroupMembers rdb.Eval: %v\n\n", err)
-		return nil, err
-	}
-	return result, nil
+func GetGroupsByRange(startIndex int, count int) (interface{}, error) {
+	return getByRange(startIndex, count, GROUPS_KEY, EMBEDDED_MEMBERS)
 }
+
+// func GetGroupMembers(ids []string) (interface{}, error) {
+// 	var b strings.Builder
+// 	b.WriteString("local t={};")
+// 	for i, v := range ids {
+// 		b.WriteString(fmt.Sprintf(GROUP_MEMBERS, i+1, i+1))
+// 		ids[i] = fmt.Sprintf("%v_members", v)
+// 	}
+// 	b.WriteString("return t;")
+// 	result, err := rdb.Eval(ctx, b.String(), ids).Result()
+// 	if err != nil {
+// 		fmt.Printf("\n\nError redis.GetGroupMembers rdb.Eval: %v\n\n", err)
+// 		return nil, err
+// 	}
+// 	return result, nil
+// }
 
 func AddGroup(doc []byte, groupName, uuid string, members, ids []string) error {
 	return saveGroupBits(doc, groupName, uuid, members, ids, true)
@@ -363,8 +335,9 @@ func saveGroupBits(doc []byte, groupName, uuid string, members, ids []string, cr
 		argI = 4
 	}
 
+	keys = append(keys, uuid+"_members")
 	if len(ids) > 0 {
-		keys = append(keys, uuid+"_members")
+		// keys = append(keys, uuid+"_members")
 		b.WriteString("redis.call('HSet',KEYS[5]")
 		var i int
 		var v string
@@ -460,13 +433,8 @@ func ReplaceGroupMembers(uuid string, ids, members []string) error {
 	return nil
 }
 
-// delete group doc - delete group lookup hash - remove from _groups list - delete members hash - delete reverse lookup hash
-//"redis.call('del',KEYS[1]);redis.call('HDel',KEYS[2],ARGV[1]);redis.call('LRem',KEYS[3],0,ARGV[2]);redis.call('Del',KEYS[4]);redis.call('HDel',KEYS[5],ARGV[2]);return 1;"
-// get group name - delete each members _groups hash entry - delete group doc - delete group lookup hash - remove from _groups list - delete members hash - delete reverse lookup hash
-//"local n = redis.call('HGet',KEYS[1],ARGV[1]); local m = redis.call('HKeys',KEYS[2]); for k,v in ipairs(m) do redis.call('HDel',KEYS[v.."_groups"],ARGV[1]); end; redis.call('del',KEYS[3]);redis.call('HDel',KEYS[4],n);redis.call('LRem',KEYS[5],0,ARGV[1]);redis.call('Del',KEYS[2]);redis.call('HDel',KEYS[1],ARGV[1]);return 1;"
 func DelGroup(uuid string) error {
-	// err := rdb.Eval(ctx, DEL_GROUP_CMD, []string{uuid, GROUPS_LOOKUP_KEY, GROUPS_KEY, uuid + "_members", GROUPS_REVERSE_LOOKUP_KEY}, displayName, uuid).Err()
-	err := rdb.Eval(ctx, DEL_GROUP_CMD, []string{GROUPS_REVERSE_LOOKUP_KEY, uuid + "_members", uuid, GROUPS_LOOKUP_KEY, GROUPS_KEY}, uuid).Err()
+	err := rdb.EvalSha(ctx, luaScripts.LuaDeleteGroup, []string{GROUPS_REVERSE_LOOKUP_KEY, uuid + "_members", uuid, GROUPS_LOOKUP_KEY, GROUPS_KEY}, uuid).Err()
 	if err != nil {
 		log.Printf("Redis Error Deleting Group: %s\nerr: %v\n\n", uuid, err)
 		return err
@@ -474,25 +442,11 @@ func DelGroup(uuid string) error {
 	return nil
 }
 
-/*
-	get group name - local k=redis.call('HGet',KEYS[1],ARGV[1]);
-	delete group lookup - redis.call('HDel',KEYS[2],k);
-	set reverse lookup to name - redis.call('HSet',KEYS[1],ARGV[1],ARGV[2]);
-	set group lookup - redis.call('HSet',KEYS[2],ARGV[2],ARGV[1]);
-	//define functions to encode/decode - local function code (s) return (string.gsub(s, "\\(.)", function (x) return string.format("\\%03d", string.byte(x)) end)); end local function decode (s) return (string.gsub(s, "\\(%d%d%d)", function (d) return "\\" .. string.char(d) end)); end
-	get group doc - local j=redis.call("Get",KEYS[3]);
-	//remove " - j=code(j);
-	update group name - j = string.gsub(j,"\"displayName\":\".-\"","\"displayName\":\"` + name + `\"");
-	//add " - j = decode(j);
-	save group doc - redis.call('Set',KEYS[3],j);
-	define group snippet with new name - local g='{"value":"'..ARGV[1]..'","display":"'..ARGV[2]..'"}';
-	assign snippet to each memembers *_groups hash - local m=redis.call('HKeys',KEYS[4]);for k,v in ipairs(m) do redis.call('HSet',v.."_groups",ARGV[1],g);end; return 1;
-*/
 func UpdateGroupName(uuid string, name string) error {
 	// cmd := `local k=redis.call('HGet',KEYS[1],ARGV[1]);redis.call('HDel',KEYS[2],k);redis.call('HSet',KEYS[1],ARGV[1],ARGV[2]);redis.call('HSet',KEYS[2],ARGV[2],ARGV[1]);  local function code (s) return (string.gsub(s, "\\(.)", function (x) return string.format("\\%03d", string.byte(x)) end)); end local function decode (s) return (string.gsub(s, "\\(%d%d%d)", function (d) return "\\" .. string.char(d) end)); end local j=redis.call("Get",KEYS[3]); j=code(j); j = string.gsub(j,"\"displayName\":\".-\"","\"displayName\":\"` + name + `\""); j = decode(j);  redis.call('Set',KEYS[3],j); local g='{"value":"'..ARGV[1]..'","display":"'..ARGV[2]..'"}'; local m=redis.call('HKeys',KEYS[4]);for k,v in ipairs(m) do redis.call('HSet',v.."_groups",ARGV[1],g);end; return 1;`
-	cmd := `local k=redis.call('HGet',KEYS[1],ARGV[1]);redis.call('HDel',KEYS[2],k);redis.call('HSet',KEYS[1],ARGV[1],ARGV[2]);redis.call('HSet',KEYS[2],ARGV[2],ARGV[1]);  local j=redis.call("Get",KEYS[3]); j = string.gsub(j,"\"displayName\":\".-\"","\"displayName\":\"` + name + `\"");   redis.call('Set',KEYS[3],j); local g='{"value":"'..ARGV[1]..'","display":"'..ARGV[2]..'"}'; local m=redis.call('HKeys',KEYS[4]);for k,v in ipairs(m) do redis.call('HSet',v.."_groups",ARGV[1],g);end; return 1;`
+	// cmd := `local k=redis.call('HGet',KEYS[1],ARGV[1]);redis.call('HDel',KEYS[2],k);redis.call('HSet',KEYS[1],ARGV[1],ARGV[2]);redis.call('HSet',KEYS[2],ARGV[2],ARGV[1]);  local j=redis.call("Get",KEYS[3]); j = string.gsub(j,"\"displayName\":\".-\"","\"displayName\":\"` + name + `\"");   redis.call('Set',KEYS[3],j); local g='{"value":"'..ARGV[1]..'","display":"'..ARGV[2]..'"}'; local m=redis.call('HKeys',KEYS[4]);for k,v in ipairs(m) do redis.call('HSet',v.."_groups",ARGV[1],g);end; return 1;`
 
-	err := rdb.Eval(ctx, cmd, []string{GROUPS_REVERSE_LOOKUP_KEY, GROUPS_LOOKUP_KEY, uuid, uuid + "_members"}, uuid, name).Err()
+	err := rdb.EvalSha(ctx, luaScripts.LuaUpdateGroupName, []string{GROUPS_REVERSE_LOOKUP_KEY, GROUPS_LOOKUP_KEY, uuid, uuid + "_members"}, uuid, name).Err()
 	if err != nil {
 		log.Printf("Redis Error UpdateGroupName for UUID: %s\nerr: %v\n\n", uuid, err)
 		return err
