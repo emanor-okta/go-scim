@@ -237,6 +237,8 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 				return
 			}
 
+			// res.Header().Add("Retry-After", "300")
+			// res.WriteHeader(http.StatusTooManyRequests)
 			res.WriteHeader(http.StatusNoContent)
 			res.Write(nil)
 		} else {

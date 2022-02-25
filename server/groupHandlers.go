@@ -90,8 +90,9 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 		b, _ = json.Marshal(m)
 		m["members"] = []interface{}{}
 		doc, _ := json.Marshal(m)
+		groupSnippet := fmt.Sprintf(`{"display":"%v","value":"%v"}`, m["displayName"], uuid)
 
-		if err = utils.AddGroup(doc, m["displayName"].(string), uuid, mems, ids); err != nil {
+		if err = utils.AddGroup(doc, m["displayName"].(string), uuid, groupSnippet, mems, ids); err != nil {
 			res.WriteHeader(http.StatusOK)
 			res.Write(nil)
 			return
@@ -177,8 +178,9 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 			b, _ = json.Marshal(m)
 			m["members"] = []interface{}{}
 			doc, _ := json.Marshal(m)
+			groupSnippet := fmt.Sprintf(`{"display":"%v","value":"%v"}`, m["displayName"], uuid)
 
-			if err = utils.UpdateGroup(doc, m["displayName"].(string), uuid, mems, ids); err != nil {
+			if err = utils.UpdateGroup(doc, m["displayName"].(string), uuid, groupSnippet, mems, ids); err != nil {
 				handleErrorResponse(&res, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -251,43 +253,6 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 		}
 	}
 }
-
-// CAN DELETE
-// func getGroupMembers(group []map[string]interface{}) {
-// 	var ids []string
-// 	for _, v := range group {
-// 		ids = append(ids, v["id"].(string))
-// 	}
-
-// 	result, err := utils.GetGroupMembers(ids)
-// 	if err != nil {
-// 		return
-// 	}
-
-// 	for i, v := range result.([]interface{}) {
-// 		if len(v.([]interface{})) == 0 {
-// 			continue
-// 		}
-
-// 		var b strings.Builder
-// 		b.WriteString("[")
-// 		for i_, v_ := range v.([]interface{}) {
-// 			if i_ > 0 {
-// 				b.WriteString(",")
-// 			}
-// 			b.WriteString(v_.(string))
-// 		}
-
-// 		b.WriteString("]")
-// 		// fmt.Printf("groups: %v\n\n", b.String())
-// 		var j interface{}
-// 		if err = json.Unmarshal([]byte(b.String()), &j); err != nil {
-// 			fmt.Printf("Error groupHandlers.getGroupMembers Unmarshall error: %v\n", err)
-// 			continue
-// 		}
-// 		group[i]["members"] = j
-// 	}
-// }
 
 /*
 	Used by both Group/User requests to prepare either a list of members or groups to send to Redis
