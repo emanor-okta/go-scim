@@ -4,7 +4,8 @@ redis:
     db: 0
 server:
     address: ":8082"
-    debug_headers: true
-    debug_body: true
+    debug_headers: false
+    debug_body: false
+    debug_query: false
 scim:
     enable_groups: true

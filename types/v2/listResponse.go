@@ -10,5 +10,5 @@ type ListResponse struct {
 	TotalResults int           `json:"totalResults"`
 	StartIndex   int           `json:"startIndex"`
 	ItemsPerPage int           `json:"itemsPerPage"`
-	Resources    []interface{} `json:"resources"`
+	Resources    []interface{} `json:"Resources"`
 }

@@ -22,7 +22,10 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 		// GET
 		var grps interface{}
 		q := getQuery(req.URL.Query())
-		debugQueryParams(&q)
+		if debugQuery {
+			debugQueryParams(&q)
+		}
+
 		if q.filter.displayName != "" {
 			// ?filter=displayName eq <group name>
 			g, err := utils.GetGroupByFilter(q.filter.displayName)
@@ -43,12 +46,14 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 		}
 
 		groups := embedGroupsMembers(grps)
+		reqFilter.GroupsGetResponse(groups)
+
 		lr := buildListResponse(groups)
 		j, err := json.Marshal(&lr)
 		if err != nil {
 			log.Fatalf("Error Marshalling ListResponse: %v\n", err)
 		}
-		fmt.Println(string(j))
+
 		res.WriteHeader(http.StatusOK)
 		res.Write(j)
 
@@ -69,22 +74,12 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		// TODO - SHOULD REMOVE THIS CHECK and make the AddGroup call fail if GROUP Already Exists
-		if _, err = utils.GetGroupByFilter(m["displayName"].(string)); err == nil {
-			// group already exist return 409
-			handleErrorResponse(&res, GROUPALREADY_EXISTS, http.StatusConflict)
-			return
-		}
-
 		uuid := utils.GenerateUUID()
 		meta := v2.Meta{ResourceType: v2.TYPE_GROUP, Location: v2.LOCATION_GROUP + uuid}
 		m["meta"] = meta
 		m["id"] = uuid
 
-		// if UsersPostReqFilter != nil {
-		// 	doc = UsersPostReqFilter.UserPostRequest(doc)
-		// }
-
+		reqFilter.GroupsPostRequest(m)
 		ids, mems := buildGroupsMembersList(m["members"].([]interface{}))
 
 		b, _ = json.Marshal(m)
@@ -93,15 +88,15 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 		groupSnippet := fmt.Sprintf(`{"display":"%v","value":"%v"}`, m["displayName"], uuid)
 
 		if err = utils.AddGroup(doc, m["displayName"].(string), uuid, groupSnippet, mems, ids); err != nil {
-			res.WriteHeader(http.StatusOK)
-			res.Write(nil)
+			if err.Error() == "group_already_exists" {
+				handleErrorResponse(&res, GROUPALREADY_EXISTS, http.StatusConflict)
+			} else {
+				handleErrorResponse(&res, fmt.Sprintf("Error adding group: %v", err), http.StatusInternalServerError)
+			}
 			return
 		}
 
-		// if UsersPostResFilter != nil {
-		// 	doc = UsersPostResFilter.UserPostResponse(doc)
-		// }
-
+		b = reqFilter.GroupsPostResponse(b)
 		res.WriteHeader(http.StatusCreated)
 		res.Write(b)
 	} else {
@@ -140,13 +135,15 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 		// GET
 		grp, err := utils.GetGroupByUUID(uuid)
 		if err != nil {
-			handleErrorForKeyLookup(&res, err)
+			handleErrorForKeyLookup(&res, err, uuid)
 			return
 		}
 
 		groups := embedGroupsMembers([]interface{}{grp})
+		groups[0] = reqFilter.GroupsIdGetResponse(groups[0])
 		res.WriteHeader(http.StatusOK)
-		res.Write([]byte(groups[0].(string)))
+		// res.Write([]byte(groups[0].(string)))
+		res.Write(groups[0].([]byte))
 	} else {
 		b, err := getBody(req)
 		if err != nil {
@@ -157,9 +154,6 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 
 		if req.Method == http.MethodPut {
 			// PUT
-			// if UsersPutReqFilter != nil {
-			// 	b = UsersPutReqFilter.UserIdPutRequest(b)
-			// }
 			var m map[string]interface{}
 			if err := json.Unmarshal(b, &m); err != nil {
 				log.Printf("Error decoding Json Data: %v\n", err)
@@ -173,6 +167,7 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 			m["meta"] = meta
 			m["id"] = uuid
 
+			reqFilter.GroupsIdPutRequest(m)
 			ids, mems := buildGroupsMembersList(m["members"].([]interface{}))
 
 			b, _ = json.Marshal(m)
@@ -185,9 +180,7 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			// if UsersPutResFilter != nil {
-			// 	b = UsersPutResFilter.UserIdPutResponse(b)
-			// }
+			b = reqFilter.GroupsIdPutResponse(b)
 
 			res.WriteHeader(http.StatusOK)
 			res.Write(b)
@@ -200,9 +193,7 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			// if UsersPatchReqFilter != nil {
-			// 	UsersPatchReqFilter.UserIdPatchRequest(&ops)
-			// }
+			reqFilter.GroupsIdPatchRequest(&ops)
 
 			// process list of operations  ** TODO - Should this be run in a single transaction ?? **
 			for _, o := range ops.Operations {
@@ -261,7 +252,6 @@ func buildGroupsMembersList(a []interface{}) ([]string, []string) {
 	mems := []string{}
 	ids := []string{}
 	for _, g := range a {
-		// g := v.(map[string]interface{})
 		g := g.(map[string]interface{})
 		mems = append(mems, fmt.Sprintf(`{"display":"%v","value":"%v"}`, g["display"].(string), g["value"].(string)))
 		ids = append(ids, g["value"].(string))

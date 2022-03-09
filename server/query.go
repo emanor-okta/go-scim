@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -24,19 +23,6 @@ type query struct {
 	filter     _filter
 	startIndex int
 	count      int
-}
-
-func didRedirect(res *http.ResponseWriter, req *http.Request) bool {
-	fmt.Println(req.URL)
-	if strings.Contains(req.URL.Path, `/v1/`) {
-		redir := "https://c0f2-2601-644-8f00-d4e0-75c2-52f6-159f-3085.ngrok.io" + strings.Replace(req.URL.Path, `/v1`, `/v2`, 1)
-		fmt.Println(redir)
-		(*res).Header().Add("Location", redir)
-		(*res).WriteHeader(http.StatusPermanentRedirect)
-		(*res).Write(nil)
-		return true
-	}
-	return false
 }
 
 func getQuery(params url.Values) query {
@@ -79,8 +65,5 @@ func getQuery(params url.Values) query {
 }
 
 func debugQueryParams(q *query) {
-	fmt.Printf("count: %v\n", q.count)
-	fmt.Printf("filter userName: %v\n", q.filter.userName)
-	fmt.Printf("filter displayName: %v\n", q.filter.displayName)
-	fmt.Printf("startIndex: %v\n", q.startIndex)
+	fmt.Printf("\ncount: %v\nfilter userName: %v\nfilter displayName: %v\nstartIndex: %v\n\n", q.count, q.filter.userName, q.filter.displayName, q.startIndex)
 }

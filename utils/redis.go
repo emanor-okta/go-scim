@@ -108,7 +108,9 @@ func UpdateDoc(key string, doc interface{}) error {
 }
 
 func getByRange(startIndex int, count int, key, embedded_key string) (interface{}, error) {
-	result, err := rdb.EvalSha(ctx, luaScripts.LuaGetByRange, []string{key, embedded_key}, []string{fmt.Sprintf("%v", startIndex-1), fmt.Sprintf("%v", startIndex-1+count-1)}).Result()
+	keys := []string{key, embedded_key}
+	args := []string{fmt.Sprintf("%v", startIndex-1), fmt.Sprintf("%v", startIndex-1+count-1)}
+	result, err := rdb.EvalSha(ctx, luaScripts.LuaGetByRange, keys, args).Result()
 	if err != nil {
 		log.Printf("Redis Error Getting %v by Range, startIndex: %v, count: %v\nerr: %v\n\n", key, startIndex, count, err)
 		return nil, err
@@ -118,7 +120,7 @@ func getByRange(startIndex int, count int, key, embedded_key string) (interface{
 }
 
 func getByFilter(name, key, embedded_key string) (interface{}, error) {
-	result, err := rdb.EvalSha(ctx, luaScripts.LuaGetByFilter, []string{key, embedded_key}, []string{name}).Result()
+	result, err := rdb.EvalSha(ctx, luaScripts.LuaGetByFilter, []string{key, embedded_key}, name).Result()
 	if err != nil {
 		if err != redis.Nil {
 			log.Printf("Redis Error Getting by Filter: %s\nerr: %v\n\n", name, err)
@@ -160,7 +162,9 @@ func GetUserByUUID(uuid string) (interface{}, error) {
 }
 
 func AddUser(doc []byte, userName, uuid string) error {
-	if err := rdb.EvalSha(ctx, luaScripts.LuaAddUser, []string{uuid, USERS_LOOKUP_KEY, USERS_KEY, USERS_REVERSE_LOOKUP_KEY}, doc, userName, uuid).Err(); err != nil {
+	keys := []string{uuid, USERS_LOOKUP_KEY, USERS_KEY, USERS_REVERSE_LOOKUP_KEY}
+	args := []string{string(doc), userName, uuid}
+	if err := rdb.EvalSha(ctx, luaScripts.LuaAddUser, keys, args).Err(); err != nil {
 		if err != redis.Nil {
 			log.Printf("Redis Error Adding New User: %s\nerr: %v\n\n", doc, err)
 			return err
@@ -194,7 +198,8 @@ func UpdateUser(uuid string, doc []byte, active bool, userElement string, ids, g
 }
 
 func DelUser(uuid string) error {
-	if err := rdb.EvalSha(ctx, luaScripts.LuaDeleteUser, []string{uuid, USERS_LOOKUP_KEY, USERS_KEY, USERS_REVERSE_LOOKUP_KEY}, uuid /*, userName*/).Err(); err != nil {
+	keys := []string{uuid, USERS_LOOKUP_KEY, USERS_KEY, USERS_REVERSE_LOOKUP_KEY}
+	if err := rdb.EvalSha(ctx, luaScripts.LuaDeleteUser, keys, uuid).Err(); err != nil {
 		if err != redis.Nil {
 			log.Printf("Redis Error Deleting User: %s\nerr: %v\n\n", uuid, err)
 			return err
@@ -205,7 +210,9 @@ func DelUser(uuid string) error {
 }
 
 func PatchUser(uuid string, userPatch UserPatch) error {
-	if err := rdb.EvalSha(ctx, luaScripts.LuaPatchUser, []string{uuid, fmt.Sprintf("%v", userPatch.Active), fmt.Sprintf("%v", userPatch.Password)}, fmt.Sprintf("%v", userPatch.ActiveValue), userPatch.PasswordValue).Err(); err != nil {
+	keys := []string{uuid, fmt.Sprintf("%v", userPatch.Active), fmt.Sprintf("%v", userPatch.Password)}
+	args := []string{fmt.Sprintf("%v", userPatch.ActiveValue), userPatch.PasswordValue}
+	if err := rdb.EvalSha(ctx, luaScripts.LuaPatchUser, keys, args).Err(); err != nil {
 		if err != redis.Nil {
 			log.Printf("Redis Error Patching User: %s\nerr: %v\n\n", uuid, err)
 			return err
@@ -243,8 +250,11 @@ func AddGroup(doc []byte, groupName, uuid, groupSnippet string, members, ids []s
 	}
 
 	if err := rdb.EvalSha(ctx, luaScripts.LuaAddGroup, keys, args).Err(); err != nil {
-		log.Printf("Redis Error Adding Group with Members: %s\nerr: %v\n\n", doc, err)
-		return err
+		if err != redis.Nil {
+			log.Printf("Redis Error Adding Group with Members: %s\nerr: %v\n\n", doc, err)
+			return err
+		}
+		return errors.New("group_already_exists")
 	}
 	return nil
 }
@@ -327,40 +337,40 @@ func UpdateGroupName(uuid string, name string) error {
 	return nil
 }
 
-func Test(user []byte) {
+// func Test(user []byte) {
 
-	// cmd := "redis.call('set', KEYS[1], ARGV[1]); redis.call('HSet', KEYS[2], ARGV[2], ARGV[3]); redis.call('LPush', KEYS[3], ARGV[3]); return 1;"
-	// if err := rdb.Eval(ctx, cmd, []string{"8888", USERS_LOOKUP_KEY, USERS_KEY}, user, "test@mail.com", "8888").Err(); err != nil {
-	// 	log.Fatalln(err)
-	// }
+// 	// cmd := "redis.call('set', KEYS[1], ARGV[1]); redis.call('HSet', KEYS[2], ARGV[2], ARGV[3]); redis.call('LPush', KEYS[3], ARGV[3]); return 1;"
+// 	// if err := rdb.Eval(ctx, cmd, []string{"8888", USERS_LOOKUP_KEY, USERS_KEY}, user, "test@mail.com", "8888").Err(); err != nil {
+// 	// 	log.Fatalln(err)
+// 	// }
 
-	cmd := `redis.call('set', "k1", 'mm\\\"m'); return 1;`
-	if err := rdb.Eval(ctx, cmd, []string{}).Err(); err != nil {
-		fmt.Println(err.Error())
-	}
-}
+// 	cmd := `redis.call('set', "k1", 'mm\\\"m'); return 1;`
+// 	if err := rdb.Eval(ctx, cmd, []string{}).Err(); err != nil {
+// 		fmt.Println(err.Error())
+// 	}
+// }
 
-func Test2() {
-	// cmd := "local myTable={}; local l1=redis.call('hgetall',KEYS[1]); local l2=redis.call('hgetall',KEYS[2]); local l3=redis.call('hgetall',KEYS[3]); myTable[1]='__USER__L1'; myTable[2]=l1; myTable[3]='__USER__L2'; myTable[4]=l2; myTable[5]='__USER__L3'; myTable[6]=l3; return myTable"
-	cmd := "local myTable={}; myTable[1]=redis.call('hgetall',KEYS[1]); myTable[2]=redis.call('hgetall',KEYS[2]); myTable[3]=redis.call('hgetall',KEYS[3]); return myTable"
+// func Test2() {
+// 	// cmd := "local myTable={}; local l1=redis.call('hgetall',KEYS[1]); local l2=redis.call('hgetall',KEYS[2]); local l3=redis.call('hgetall',KEYS[3]); myTable[1]='__USER__L1'; myTable[2]=l1; myTable[3]='__USER__L2'; myTable[4]=l2; myTable[5]='__USER__L3'; myTable[6]=l3; return myTable"
+// 	cmd := "local myTable={}; myTable[1]=redis.call('hgetall',KEYS[1]); myTable[2]=redis.call('hgetall',KEYS[2]); myTable[3]=redis.call('hgetall',KEYS[3]); return myTable"
 
-	keys := []string{"k1", "k2", "non"}
-	result, err := rdb.Eval(ctx, cmd, keys).Result()
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Result: %v\n", result)
-	fmt.Printf("result: %T\n", result)
+// 	keys := []string{"k1", "k2", "non"}
+// 	result, err := rdb.Eval(ctx, cmd, keys).Result()
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	fmt.Printf("Result: %v\n", result)
+// 	fmt.Printf("result: %T\n", result)
 
-	fmt.Printf("result: %T\n", (result.([]interface{})[0]).([]interface{})[0])
-	for i, v := range result.([]interface{}) {
-		a := v.([]interface{})
-		if len(a) == 0 {
-			fmt.Printf("%v  -- EMPTY\n", keys[i])
-			continue
-		}
-		for ii, vv := range a {
-			fmt.Printf("%v  --  i: %v, v: %v\n", keys[i], ii, vv)
-		}
-	}
-}
+// 	fmt.Printf("result: %T\n", (result.([]interface{})[0]).([]interface{})[0])
+// 	for i, v := range result.([]interface{}) {
+// 		a := v.([]interface{})
+// 		if len(a) == 0 {
+// 			fmt.Printf("%v  -- EMPTY\n", keys[i])
+// 			continue
+// 		}
+// 		for ii, vv := range a {
+// 			fmt.Printf("%v  --  i: %v, v: %v\n", keys[i], ii, vv)
+// 		}
+// 	}
+// }

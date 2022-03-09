@@ -7,6 +7,12 @@ package utils
 	Useed by redis.getByRange(startIndex int, count int, key, embedded_key string) (interface{}, error)
 	Gets either users or groups by range
 
+	KEYS[1] = uuid
+	KEYS[2] = key for embedded elements (either '_groups' or '_members' depending if this is used for a user or group call)
+
+	ARGV[1] = start index
+	ARGV[2] = count
+
 	get ids - local ids=redis.call('LRange',KEYS[1],ARGV[1],ARGV[2]);
 	define outer map, loop through ids - local outer={};local oi=1;for k,id in ipairs(ids) do
 	define inner map, get doc for id - local inner={};inner[1]=redis.call('Get',id);
@@ -21,6 +27,11 @@ const LUA_GET_BY_RANGE = `local ids=redis.call('LRange',KEYS[1],ARGV[1],ARGV[2])
 	Used by redis.getByFilter(name, key, embedded_key string) (interface{}, error)
 	Gets a user or a group by name
 
+	KEYS[1] = uuid
+	KEYS[2] = key for embedded elements (either '_groups' or '_members' depending if this is used for a user or group call)
+
+	ARGV[1] = name (group or user depending on call)
+
 	get records uuid - local uuid=redis.call('HGet', KEYS[1],ARGV[1]);
 	if not found return nil - if not uuid then return nil; end;
 	add doc as 1st element - local t={};t[1]=redis.call('Get',uuid);
@@ -32,6 +43,9 @@ const LUA_GET_BY_FILTER = `local uuid=redis.call('HGet', KEYS[1],ARGV[1]);if not
 /*
 	Used by redis.getByUUID(uuid, embedded_key string) (interface{}, error)
 	Get a user or group by UUID
+
+	KEYS[1] = uuid
+	KEYS[2] = key for embedded elements (either '_groups' or '_members' depending if this is used for a user or group call)
 
 	get doc - local doc=redis.call('Get', KEYS[1]);
 	if not found return nil - if not doc then return nil; end;
@@ -48,6 +62,15 @@ const LUA_GET_BY_UUID = `local doc=redis.call('Get', KEYS[1]);if not doc then re
 	Used by redis.AddUser(doc []byte, userName, uuid string) error
 	Adds a new user
 
+	KEYS[1] = uuid
+	KEYS[2] = USERS_LOOKUP_KEY
+	KEYS[3] = USERS_KEY
+	KEYS[4] = USERS_REVERSE_LOOKUP_KEY
+
+	ARGV[1] = user doc
+	ARGV[2] = userName
+	ARGV[3] = uuid
+
 	check if user exists - if redis.call('HExists',KEYS[2],ARGV[2]) == 1 then return nil;end;
 	set user doc - redis.call('set', KEYS[1], ARGV[1]);
 	set users lookup - redis.call('HSet', KEYS[2], ARGV[2], ARGV[3]);
@@ -58,8 +81,14 @@ const LUA_GET_BY_UUID = `local doc=redis.call('Get', KEYS[1]);if not doc then re
 const LUA_ADD_USER = `if redis.call('HExists',KEYS[2],ARGV[2]) == 1 then return nil;end;redis.call('set', KEYS[1], ARGV[1]);redis.call('HSet', KEYS[2], ARGV[2], ARGV[3]);redis.call('HSet', KEYS[4], ARGV[3], ARGV[2]);redis.call('LPush', KEYS[3], ARGV[3]);return 1;`
 
 /*
-	Used by Redis.UpdateUser((uuid string, doc []byte, active bool, userElement string, ids, groups []string) error
+	Used by Redis.UpdateUser(uuid string, doc []byte, active bool, userElement string, ids, groups []string) error
 	Update ACTIVE user, add groups
+
+	KEYS[1] = uuid
+
+	ARGV[1] = user doc
+	ARGV[2] = user snippet for groups (not used for inactive)
+	ARGV[3] = number of groups in ARGV if user is becoming active (not used for inactive)
 
 	replace existing user doc - redis.call('Set',KEYS[1],ARGV[1]);
 	loop through groups - for i = 4,2*ARGV[3]+2,2 do
@@ -71,8 +100,14 @@ const LUA_ADD_USER = `if redis.call('HExists',KEYS[2],ARGV[2]) == 1 then return 
 const LUA_UPDATE_USER_ACTIVE = `redis.call('Set',KEYS[1],ARGV[1]);for i = 4,2*ARGV[3]+2,2 do redis.call('HSet',KEYS[1].."_groups",ARGV[i],ARGV[i+1]);redis.call('HSet',ARGV[i].."_members",KEYS[1],ARGV[2]);end;return 1;`
 
 /*
-	Used by Redis.UpdateUser(uuid string, doc []byte, active bool, ids, groups []string) error
+	Used by Redis.UpdateUser(uuid string, doc []byte, active bool, userElement string, ids, groups []string) error
 	Update IN-ACTIVE user, remove group
+
+	KEYS[1] = uuid
+
+	ARGV[1] = user doc
+	ARGV[2] = user snippet for groups (not used for inactive)
+	ARGV[3] = number of groups in ARGV if user is becoming active (not used for inactive)
 
 	replace existing user doc - redis.call('Set',KEYS[1],ARGV[1]);
 	get users groups - local grps=redis.call('HKeys',KEYS[1].."_groups");
@@ -85,6 +120,13 @@ const LUA_UPDATE_USER_INACTIVE = `redis.call('Set',KEYS[1],ARGV[1]);local grps=r
 /*
 	Used by redis.DelUser(uuid string) error
 	Deletes a user
+
+	KEYS[1] = uuid
+	KEYS[2] = USERS_LOOKUP_KEY
+	KEYS[3] = USERS_KEY
+	KEYS[4] = USERS_REVERSE_LOOKUP_KEY
+
+	ARGV[1] = uuid
 
 	get user name - local n=redis.call('HGet',KEYS[4],ARGV[1]);
 	user not found return - if not n then return nil;end;
@@ -102,6 +144,13 @@ const LUA_DELETE_USER = `local n=redis.call('HGet',KEYS[4],ARGV[1]);if not n the
 /*
 	Used by redis.PatchUser(uuid string, userPatch UserPatch) error
 	Changes user 'password' or 'active' status
+
+	KEYS[1] = uuid
+	KEYS[2] = Active attribute is changing (boolean)
+	KEYS[3] = Password attribute is changing (boolean)
+
+	ARGV[1] = Active attribute
+	ARGV[2] = Password attribute
 
 	get user doc - local u=redis.call('Get',KEYS[1]);
 	user not found return - if not u then return nil;end;
@@ -125,6 +174,14 @@ const LUA_PATCH_USER = `local u=redis.call('Get',KEYS[1]);if not u then return n
 	Used by redis.DelGroup(uuid string) error
 	Deletes a group
 
+	KEYS[1] = GROUPS_REVERSE_LOOKUP_KEY
+	KEYS[2] = uuid + "_members"
+	KEYS[3] = uuid
+	KEYS[4] = GROUPS_LOOKUP_KEY
+	KEYS[5] = GROUPS_KEY
+
+	ARGV[1] = uuid
+
 	get group name - local n = redis.call('HGet',KEYS[1],ARGV[1]);
 	get group members - local m = redis.call('HKeys',KEYS[2]);
 	foreach members remove this group - for k,v in ipairs(m) do redis.call('HDel',v.."_groups",ARGV[1]);end;
@@ -140,6 +197,14 @@ const LUA_DELETE_GROUP = `local n = redis.call('HGet',KEYS[1],ARGV[1]); local m 
 	Used by redis.UpdateGroupName(uuid string, name string) error
 	Updates a group name
 
+	KEYS[1] = GROUPS_REVERSE_LOOKUP_KEY
+	KEYS[2] = GROUPS_LOOKUP_KEY
+	KEYS[3] = uuid
+	KEYS[4] = uuid + "_members"
+
+	ARGV[1] = uuid
+	ARGV[2] = new group name
+
 	get group name - local k=redis.call('HGet',KEYS[1],ARGV[1]);
 	delete group lookup - redis.call('HDel',KEYS[2],k);
 	set reverse lookup to name - redis.call('HSet',KEYS[1],ARGV[1],ARGV[2]);
@@ -153,11 +218,11 @@ const LUA_DELETE_GROUP = `local n = redis.call('HGet',KEYS[1],ARGV[1]); local m 
 	define group snippet with new name - local g='{"value":"'..ARGV[1]..'","display":"'..ARGV[2]..'"}';
 	assign snippet to each memembers *_groups hash - local m=redis.call('HKeys',KEYS[4]);for k,v in ipairs(m) do redis.call('HSet',v.."_groups",ARGV[1],g);end; return 1;
 */
-const LUA_UPDATE_GROUP_NAME = `local k=redis.call('HGet',KEYS[1],ARGV[1]);redis.call('HDel',KEYS[2],k);redis.call('HSet',KEYS[1],ARGV[1],ARGV[2]);redis.call('HSet',KEYS[2],ARGV[2],ARGV[1]);  local j=redis.call("Get",KEYS[3]); j = string.gsub(j,"\"displayName\":\".-\"","\"displayName\":\""..ARGV[2].."\"");   redis.call('Set',KEYS[3],j); local g='{"value":"'..ARGV[1]..'","display":"'..ARGV[2]..'"}'; local m=redis.call('HKeys',KEYS[4]);for k,v in ipairs(m) do redis.call('HSet',v.."_groups",ARGV[1],g);end; return 1;`
+const LUA_UPDATE_GROUP_NAME = `local k=redis.call('HGet',KEYS[1],ARGV[1]);redis.call('HDel',KEYS[2],k);redis.call('HSet',KEYS[1],ARGV[1],ARGV[2]);redis.call('HSet',KEYS[2],ARGV[2],ARGV[1]);  local j=redis.call("Get",KEYS[3]); j = string.gsub(j,"\"displayName\":\".-\"","\"displayName\":\""..ARGV[2].."\"");redis.call('Set',KEYS[3],j); local g='{"value":"'..ARGV[1]..'","display":"'..ARGV[2]..'"}'; local m=redis.call('HKeys',KEYS[4]);for k,v in ipairs(m) do redis.call('HSet',v.."_groups",ARGV[1],g);end; return 1;`
 
 /*
-
 	Adds a new group
+	used by redis.AddGroup(doc []byte, groupName, uuid, groupSnippet string, members, ids []string) error
 
 	KEYS[1] = uuid
 	KEYS[2] = GROUPS_LOOKUP_KEY
@@ -165,6 +230,7 @@ const LUA_UPDATE_GROUP_NAME = `local k=redis.call('HGet',KEYS[1],ARGV[1]);redis.
 	KEYS[4] = GROUPS_KEY
 	KEYS[5] = {uuid + "_members"}
 	KEYS[6..] = each members groups hash key (uuid_groups)
+
 	ARGV[1] = group doc
 	ARGV[2] = groupName
 	ARGV[3] = uuid
@@ -172,6 +238,7 @@ const LUA_UPDATE_GROUP_NAME = `local k=redis.call('HGet',KEYS[1],ARGV[1]);redis.
 	ARGV[5] = {number of members}
 	ARGV[6..] = increments in 2, 1 is members uuid, 2 is members snippet ("value":"{uuid}","display":"{username}")
 
+	check if group already exists - if redis.call('HExists',KEYS[2],ARGV[2]) == 1 then return nil;end;
 	set group doc - redis.call('Set',KEYS[1],ARGV[1]);
 	set groups lookup - redis.call('HSet',KEYS[2],ARGV[2],ARGV[3]);
 	set groups reverse lookup - redis.call('HSet',KEYS[3],ARGV[3],ARGV[2]);
@@ -184,11 +251,11 @@ const LUA_UPDATE_GROUP_NAME = `local k=redis.call('HGet',KEYS[1],ARGV[1]);redis.
 	end loop though members - end;
 	return success - return 1;
 */
-const LUA_ADD_GROUP = `redis.call('Set',KEYS[1],ARGV[1]);redis.call('HSet',KEYS[2],ARGV[2],ARGV[3]);redis.call('HSet',KEYS[3],ARGV[3],ARGV[2]);redis.call('LPush',KEYS[4],ARGV[3]);local ai=6;for ki=6,6+ARGV[5]-1,1 do redis.call('HSet',KEYS[ki],KEYS[1],ARGV[4]);redis.call('HSet',KEYS[5],ARGV[ai],ARGV[ai+1]);ai=ai+2;end;return 1;`
+const LUA_ADD_GROUP = `if redis.call('HExists',KEYS[2],ARGV[2]) == 1 then return nil;end;redis.call('Set',KEYS[1],ARGV[1]);redis.call('HSet',KEYS[2],ARGV[2],ARGV[3]);redis.call('HSet',KEYS[3],ARGV[3],ARGV[2]);redis.call('LPush',KEYS[4],ARGV[3]);local ai=6;for ki=6,6+ARGV[5]-1,1 do redis.call('HSet',KEYS[ki],KEYS[1],ARGV[4]);redis.call('HSet',KEYS[5],ARGV[ai],ARGV[ai+1]);ai=ai+2;end;return 1;`
 
 /*
-
-	Updates an existinggroup
+	Updates an existing group
+	used by redis.UpdateGroup(doc []byte, groupName, uuid, groupSnippet string, members, ids []string) error
 
 	KEYS[1] = uuid
 	KEYS[2] = GROUPS_LOOKUP_KEY
@@ -196,6 +263,7 @@ const LUA_ADD_GROUP = `redis.call('Set',KEYS[1],ARGV[1]);redis.call('HSet',KEYS[
 	KEYS[4] = GROUPS_KEY
 	KEYS[5] = {uuid + "_members"}
 	KEYS[6..] = each members groups hash key (uuid_groups)
+
 	ARGV[1] = group doc
 	ARGV[2] = groupName
 	ARGV[3] = uuid

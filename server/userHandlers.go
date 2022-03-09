@@ -30,7 +30,9 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 		// GET
 		var docs interface{}
 		q := getQuery(req.URL.Query())
-		debugQueryParams(&q)
+		if debugQuery {
+			debugQueryParams(&q)
+		}
 
 		if q.filter.userName != "" {
 			// ?filter=username eq <username>
@@ -52,6 +54,9 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 		}
 
 		users := embedUsersGroups(docs)
+
+		users = reqFilter.UserGetResponse(users)
+
 		lr := buildListResponse(users)
 
 		j, err := json.Marshal(&lr)
@@ -84,9 +89,7 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 		m["id"] = uuid
 		doc, _ := json.Marshal(m)
 
-		if UsersPostReqFilter != nil {
-			doc = UsersPostReqFilter.UserPostRequest(doc)
-		}
+		doc = reqFilter.UserPostRequest(doc)
 
 		if err = utils.AddUser(doc, m["userName"].(string), uuid); err != nil {
 			if err.Error() == "user_already_exists" {
@@ -97,9 +100,7 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		if UsersPostResFilter != nil {
-			doc = UsersPostResFilter.UserPostResponse(doc)
-		}
+		doc = reqFilter.UserPostResponse(doc)
 
 		res.WriteHeader(http.StatusCreated)
 		if _, err = res.Write(doc); err != nil {
@@ -131,7 +132,7 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 		// DELETE (not used by Okta)
 		if err := utils.DelUser(uuid); err != nil {
 			if err.Error() == NOT_FOUND {
-				handleErrorForKeyLookup(&res, err)
+				handleErrorForKeyLookup(&res, err, uuid)
 				return
 			} else {
 				log.Printf("Error for DELETE /scim/v2/User/%v, err: %v\n\n", uuid, err)
@@ -144,28 +145,13 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 		// GET
 		doc, err := utils.GetUserByUUID(uuid)
 		if err != nil {
-			handleErrorForKeyLookup(&res, err)
+			handleErrorForKeyLookup(&res, err, uuid)
 			return
 		}
 
 		user := embedUsersGroups([]interface{}{doc})
 
-		//testing till add a GET filter
-		// var m map[string]interface{}
-		// json.Unmarshal([]byte(doc), &m)
-		// m["urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"] = nil
-		// fmt.Printf("type: %T\n", m["name"])
-		// m["name"].(map[string]interface{})["formatted"] = "First Last"
-		// m["emails"].([]interface{})[0].(map[string]interface{})["value"] = "aaa@aaa.com<mailto:aaa@aaa.com>"
-		// delete(m["meta"].(map[string]interface{}), "location")
-		// delete(m, "displayName")
-		// delete(m, "groups")
-		// delete(m, "locale")
-		// delete(m, "externalId")
-		// delete(m, "password")
-		// delete(m, "phoneNumbers")
-		// m["userName"] = "aaa@aaa.com<mailto:aaa@aaa.com>"
-		// b, _ := json.Marshal(m)
+		user[0] = reqFilter.UserIdGetResponse(user[0].(string))
 
 		res.WriteHeader(http.StatusOK)
 		res.Write([]byte(user[0].(string)))
@@ -178,9 +164,8 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 		}
 
 		if req.Method == http.MethodPut {
-			if UsersPutReqFilter != nil {
-				b = UsersPutReqFilter.UserIdPutRequest(b)
-			}
+			// PUT
+			b = reqFilter.UserIdPutRequest(b)
 
 			var m map[string]interface{}
 			json.Unmarshal(b, &m)
@@ -190,13 +175,11 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 			userElement := fmt.Sprintf(`{"display":"%v","value":"%v"}`, m["userName"], uuid)
 
 			if err := utils.UpdateUser(uuid, u, m["active"].(bool), userElement, ids, groups); err != nil {
-				handleErrorForKeyLookup(&res, err)
+				handleErrorForKeyLookup(&res, err, uuid)
 				return
 			}
 
-			if UsersPutResFilter != nil {
-				b = UsersPutResFilter.UserIdPutResponse(b)
-			}
+			b = reqFilter.UserIdPutResponse(b)
 
 			res.WriteHeader(http.StatusOK)
 			if _, err = res.Write(b); err != nil {
@@ -211,9 +194,7 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			if UsersPatchReqFilter != nil {
-				UsersPatchReqFilter.UserIdPatchRequest(&ops)
-			}
+			reqFilter.UserIdPatchRequest(&ops)
 
 			patchUser := utils.UserPatch{}
 			for _, v := range ops.Operations {
@@ -229,7 +210,7 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 
 			if err := utils.PatchUser(uuid, patchUser); err != nil {
 				if err.Error() == NOT_FOUND {
-					handleErrorForKeyLookup(&res, err)
+					handleErrorForKeyLookup(&res, err, uuid)
 				} else {
 					log.Printf("Error for PATCH /scim/v2/User/%v, err: %v\n\n", uuid, err)
 					handleErrorResponse(&res, err.Error(), http.StatusInternalServerError)

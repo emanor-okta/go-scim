@@ -17,6 +17,7 @@ type Configuration struct {
 		Address       string
 		Debug_headers bool
 		Debug_body    bool
+		Debug_query   bool
 	}
 	Scim struct {
 		Enable_groups bool
