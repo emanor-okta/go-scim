@@ -1,4 +1,4 @@
-package server
+package utils
 
 import (
 	v2 "github.com/emanor-okta/go-scim/types/v2"
@@ -10,7 +10,8 @@ type ReqFilter interface {
 	UserPostResponse([]byte) []byte
 
 	// Filters for /scim/v2/Users {GET} (?filter=username eq <username> AND ?startIndex=<?>&count=<?>)
-	UserGetResponse([]interface{}) []interface{}
+	// UserGetResponse([]interface{}) []interface{}
+	UserGetResponse(*v2.ListResponse)
 
 	// Filters for /scim/v2/Users/<ID> {PUT}
 	UserIdPutRequest([]byte) []byte
@@ -24,7 +25,8 @@ type ReqFilter interface {
 	UserIdGetResponse(string) string
 
 	// Filter for /scim/v2/Groups {GET} (?filter=displayName eq <group name> AND ?startIndex=<?>&count=<?>)
-	GroupsGetResponse([]interface{})
+	// GroupsGetResponse([]interface{})
+	GroupsGetResponse(*v2.ListResponse)
 
 	// Filters for /scim/v2/Groups {POST}
 	GroupsPostRequest(map[string]interface{})

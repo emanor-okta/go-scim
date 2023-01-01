@@ -55,9 +55,10 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 
 		users := embedUsersGroups(docs)
 
-		users = reqFilter.UserGetResponse(users)
+		// users = reqFilter.UserGetResponse(users) <-- change to use v2.ListResponse below
 
 		lr := buildListResponse(users)
+		reqFilter.UserGetResponse(&lr)
 
 		j, err := json.Marshal(&lr)
 		if err != nil {

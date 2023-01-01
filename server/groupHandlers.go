@@ -46,9 +46,11 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 		}
 
 		groups := embedGroupsMembers(grps)
-		reqFilter.GroupsGetResponse(groups)
+		// reqFilter.GroupsGetResponse(groups) <-- change to pass v2.ListResponse
 
 		lr := buildListResponse(groups)
+		reqFilter.GroupsGetResponse(&lr)
+
 		j, err := json.Marshal(&lr)
 		if err != nil {
 			log.Fatalf("Error Marshalling ListResponse: %v\n", err)
@@ -174,8 +176,12 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 			m["members"] = []interface{}{}
 			doc, _ := json.Marshal(m)
 			groupSnippet := fmt.Sprintf(`{"display":"%v","value":"%v"}`, m["displayName"], uuid)
+			displayName := ""
+			if value, exists := m["displayName"]; exists && value != nil {
+				displayName = m["displayName"].(string)
+			}
 
-			if err = utils.UpdateGroup(doc, m["displayName"].(string), uuid, groupSnippet, mems, ids); err != nil {
+			if err = utils.UpdateGroup(doc, displayName, uuid, groupSnippet, mems, ids); err != nil {
 				handleErrorResponse(&res, err.Error(), http.StatusInternalServerError)
 				return
 			}

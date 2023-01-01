@@ -34,12 +34,18 @@ func (f SampleFilter) UserPostResponse(doc []byte) []byte {
 	return d
 }
 
-func (f SampleFilter) UserGetResponse(doc []interface{}) []interface{} {
+// func (f SampleFilter) UserGetResponse(doc []interface{}) []interface{} {
+// 	fmt.Println("FILTER... UserGetResponse")
+// 	if len(doc) > 0 {
+// 		doc[0] = f.UserIdGetResponse(doc[0].(string))
+// 	}
+// 	return doc
+// }
+func (f SampleFilter) UserGetResponse(lr *v2.ListResponse) {
 	fmt.Println("FILTER... UserGetResponse")
-	if len(doc) > 0 {
-		doc[0] = f.UserIdGetResponse(doc[0].(string))
+	if len(lr.Resources) > 0 {
+		lr.Resources[0].(map[string]interface{})["userName"] = "UserGetResponse@filter.com"
 	}
-	return doc
 }
 
 func (f SampleFilter) UserIdPutRequest(doc []byte) []byte {
@@ -113,13 +119,17 @@ func (f SampleFilter) UserIdGetResponse(doc string) string {
 	return string(b)
 }
 
-func (f SampleFilter) GroupsGetResponse(doc []interface{}) {
+// func (f SampleFilter) GroupsGetResponse(doc []interface{}) {
+// 	fmt.Println("FILTER...  GroupsGetResponse")
+// 	var m map[string]interface{}
+// 	json.Unmarshal([]byte(doc[0].(string)), &m)
+// 	m["displayName"] = "GroupsGetResponse Filter"
+// 	g, _ := json.Marshal(m)
+// 	doc[0] = string(g)
+// }
+func (f SampleFilter) GroupsGetResponse(lr *v2.ListResponse) {
 	fmt.Println("FILTER...  GroupsGetResponse")
-	var m map[string]interface{}
-	json.Unmarshal([]byte(doc[0].(string)), &m)
-	m["displayName"] = "GroupsGetResponse Filter"
-	g, _ := json.Marshal(m)
-	doc[0] = string(g)
+	lr.Resources[0].(map[string]interface{})["displayName"] = "GroupsGetResponse Filter"
 }
 
 func (f SampleFilter) GroupsPostRequest(m map[string]interface{}) {

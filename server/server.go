@@ -8,6 +8,8 @@ import (
 	"net/http"
 
 	"github.com/emanor-okta/go-scim/filters"
+	messageLogs "github.com/emanor-okta/go-scim/server/log"
+	"github.com/emanor-okta/go-scim/server/web"
 	v2 "github.com/emanor-okta/go-scim/types/v2"
 	"github.com/emanor-okta/go-scim/utils"
 )
@@ -21,22 +23,40 @@ const (
 var debugHeaders bool
 var debugBody bool
 var debugQuery bool
-var reqFilter ReqFilter
+var logMessages bool
+var reqFilter utils.ReqFilter
 
 func StartServer(config *utils.Configuration) {
 	debugHeaders = config.Server.Debug_headers
 	debugBody = config.Server.Debug_body
 	debugQuery = config.Server.Debug_query
+	logMessages = config.Server.Log_messages
 	log.Printf("starting server at %v\n", config.Server.Address)
 
 	middlewares := []Middleware{}
 	// TODO - Add different auth middlewares
 	if debugBody {
+		// used to log to console
 		middlewares = append(middlewares, getBodyMiddleware)
 	}
 	if debugHeaders {
+		// used to log to console
 		middlewares = append(middlewares, getHeadersMiddleware)
 	}
+	if logMessages {
+		// used for logging messages to web console
+		messageLogs.Init(config)
+		middlewares = append(middlewares, logMessagesMiddleware, logMessageResponseSudoMiddleware)
+	}
+
+	// TODO move to middlewre.go
+	// messageLogs.Init(config)
+	// middlewares = append(middlewares, func(h http.HandlerFunc) http.HandlerFunc {
+	// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// 		lrw := LoggerResponseWriter{RW: w, R: r}
+	// 		h.ServeHTTP(lrw, r)
+	// 	})
+	// })
 
 	http.HandleFunc("/scim/v2/Users", addMiddleware(handleUsers, middlewares...))
 	http.HandleFunc("/scim/v2/Users/", addMiddleware(handleUser, middlewares...))
@@ -52,6 +72,12 @@ func StartServer(config *utils.Configuration) {
 	 * SET custome filter Here
 	 */
 	reqFilter = filters.DefaultFilter{}
+	config.ReqFilter = &reqFilter
+
+	// if running web console start it
+	if config.Server.Web_console {
+		web.StartWebServer(config)
+	}
 
 	if err := http.ListenAndServe(config.Server.Address, nil); err != nil {
 		log.Fatalf("Server startup failed: %s\n", err)
@@ -89,6 +115,9 @@ func buildListResponse(docs []interface{}) v2.ListResponse {
 	lr.StartIndex = 1
 	lr.TotalResults = len(docs)
 	lr.ItemsPerPage = lr.TotalResults
+	// lr.TotalResults = 0
+	// lr.ItemsPerPage = 100
+
 	lr.Resources = []interface{}{}
 
 	for _, v := range docs {

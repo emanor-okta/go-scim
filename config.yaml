@@ -4,8 +4,11 @@ redis:
     db: 0
 server:
     address: ":8082"
+    web_address: ":8080"
+    web_console: true
     debug_headers: false
     debug_body: false
     debug_query: false
+    log_messages: true
 scim:
     enable_groups: true
