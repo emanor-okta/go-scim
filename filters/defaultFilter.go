@@ -7,11 +7,11 @@ import (
 type DefaultFilter struct {
 }
 
-func (f DefaultFilter) UserPostRequest(doc []byte) []byte {
+func (f DefaultFilter) UserPostRequest(doc []byte, path string) []byte {
 	return doc
 }
 
-func (f DefaultFilter) UserPostResponse(doc []byte) []byte {
+func (f DefaultFilter) UserPostResponse(doc []byte, path string) []byte {
 	return doc
 
 	// fmt.Println("FILTER... UserPostResponse")
@@ -42,15 +42,15 @@ func (f DefaultFilter) UserPostResponse(doc []byte) []byte {
 
 // return doc
 // }
-func (f DefaultFilter) UserGetResponse(lr *v2.ListResponse) {
+func (f DefaultFilter) UserGetResponse(lr *v2.ListResponse, path string) {
 
 }
 
-func (f DefaultFilter) UserIdPutRequest(doc []byte) []byte {
+func (f DefaultFilter) UserIdPutRequest(doc []byte, path string) []byte {
 	return doc
 }
 
-func (f DefaultFilter) UserIdPutResponse(doc []byte) []byte {
+func (f DefaultFilter) UserIdPutResponse(doc []byte, path string) []byte {
 	return doc
 
 	// fmt.Println("FILTER... UserIdPutResponse")
@@ -66,14 +66,14 @@ func (f DefaultFilter) UserIdPutResponse(doc []byte) []byte {
 	// return d
 }
 
-func (f DefaultFilter) UserIdPatchRequest(ops *v2.PatchOp) {
+func (f DefaultFilter) UserIdPatchRequest(ops *v2.PatchOp, path string) {
 }
 
-func (f DefaultFilter) UserIdPatchResponse(doc []byte) []byte {
+func (f DefaultFilter) UserIdPatchResponse(doc []byte, path string) []byte {
 	return doc
 }
 
-func (f DefaultFilter) UserIdGetResponse(doc string) string {
+func (f DefaultFilter) UserIdGetResponse(doc string, path string) string {
 	return doc
 
 	// fmt.Println("FILTER...  UserIdGetResponse")
@@ -98,14 +98,14 @@ func (f DefaultFilter) UserIdGetResponse(doc string) string {
 
 // func (f DefaultFilter) GroupsGetResponse(doc []interface{}) {
 // }
-func (f DefaultFilter) GroupsGetResponse(lr *v2.ListResponse) {
+func (f DefaultFilter) GroupsGetResponse(lr *v2.ListResponse, path string) {
 
 }
 
-func (f DefaultFilter) GroupsPostRequest(m map[string]interface{}) {
+func (f DefaultFilter) GroupsPostRequest(m map[string]interface{}, path string) {
 }
 
-func (f DefaultFilter) GroupsPostResponse(doc []byte) []byte {
+func (f DefaultFilter) GroupsPostResponse(doc []byte, path string) []byte {
 	return doc
 
 	// fmt.Println("FILTER...  GroupsPostResponse")
@@ -117,7 +117,7 @@ func (f DefaultFilter) GroupsPostResponse(doc []byte) []byte {
 	// return g
 }
 
-func (f DefaultFilter) GroupsIdGetResponse(g interface{}) interface{} {
+func (f DefaultFilter) GroupsIdGetResponse(g interface{}, path string) interface{} {
 	return []byte(g.(string))
 
 	// fmt.Println("FILTER...  GroupsIdGetResponse")
@@ -129,10 +129,10 @@ func (f DefaultFilter) GroupsIdGetResponse(g interface{}) interface{} {
 	// return g
 }
 
-func (f DefaultFilter) GroupsIdPutRequest(m map[string]interface{}) {
+func (f DefaultFilter) GroupsIdPutRequest(m map[string]interface{}, path string) {
 }
 
-func (f DefaultFilter) GroupsIdPutResponse(b []byte) []byte {
+func (f DefaultFilter) GroupsIdPutResponse(b []byte, path string) []byte {
 	return b
 
 	// fmt.Println("FILTER...  GroupsIdPutResponse")
@@ -144,5 +144,5 @@ func (f DefaultFilter) GroupsIdPutResponse(b []byte) []byte {
 	// return g
 }
 
-func (f DefaultFilter) GroupsIdPatchRequest(ops *v2.PatchOp) {
+func (f DefaultFilter) GroupsIdPatchRequest(ops *v2.PatchOp, path string) {
 }

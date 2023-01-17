@@ -6,39 +6,39 @@ import (
 
 type ReqFilter interface {
 	// Filters for /scim/v2/Users {POST}
-	UserPostRequest([]byte) []byte
-	UserPostResponse([]byte) []byte
+	UserPostRequest([]byte, string) []byte
+	UserPostResponse([]byte, string) []byte
 
 	// Filters for /scim/v2/Users {GET} (?filter=username eq <username> AND ?startIndex=<?>&count=<?>)
 	// UserGetResponse([]interface{}) []interface{}
-	UserGetResponse(*v2.ListResponse)
+	UserGetResponse(*v2.ListResponse, string)
 
 	// Filters for /scim/v2/Users/<ID> {PUT}
-	UserIdPutRequest([]byte) []byte
-	UserIdPutResponse([]byte) []byte
+	UserIdPutRequest([]byte, string) []byte
+	UserIdPutResponse([]byte, string) []byte
 
 	// Filters for /scim/v2/Users/<ID> {PATCH}
-	UserIdPatchRequest(ops *v2.PatchOp)
-	UserIdPatchResponse([]byte) []byte
+	UserIdPatchRequest(ops *v2.PatchOp, path string)
+	UserIdPatchResponse([]byte, string) []byte
 
 	// Filters for /scim/v2/Users/<ID> {GET}
-	UserIdGetResponse(string) string
+	UserIdGetResponse(string, string) string
 
 	// Filter for /scim/v2/Groups {GET} (?filter=displayName eq <group name> AND ?startIndex=<?>&count=<?>)
 	// GroupsGetResponse([]interface{})
-	GroupsGetResponse(*v2.ListResponse)
+	GroupsGetResponse(*v2.ListResponse, string)
 
 	// Filters for /scim/v2/Groups {POST}
-	GroupsPostRequest(map[string]interface{})
-	GroupsPostResponse([]byte) []byte
+	GroupsPostRequest(map[string]interface{}, string)
+	GroupsPostResponse([]byte, string) []byte
 
 	// Filters for /scim/v2/Groups/<ID> {GET}
-	GroupsIdGetResponse(interface{}) interface{}
+	GroupsIdGetResponse(interface{}, string) interface{}
 
 	// Filters for /scim/v2/Groups/<ID> {PUT}
-	GroupsIdPutRequest(map[string]interface{})
-	GroupsIdPutResponse([]byte) []byte
+	GroupsIdPutRequest(map[string]interface{}, string)
+	GroupsIdPutResponse([]byte, string) []byte
 
 	// Filters for /scim/v2/Groups/<ID> {PATCH}
-	GroupsIdPatchRequest(ops *v2.PatchOp)
+	GroupsIdPatchRequest(ops *v2.PatchOp, path string)
 }

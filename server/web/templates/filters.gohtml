@@ -8,9 +8,92 @@
   <form>
     <fieldset>
       <legend>SCIM Message</legend>
-      <p><textarea id="messageArea" name="messageArea" cols=75 rows=20 wrap="off"></textarea></p>
+      <p><b><span style="color:gray">Message Type: </span></b><span id="reqType" style="color:blue"></span></p>
+      <!--p><textarea id="messageArea" name="messageArea" cols=75 rows=20 wrap="off"></textarea></p-->
+      
+      <!--div style="width: 500px; float:left; height: 400px; margin: 10px">
+        <textarea id="messageArea" name="messageArea" cols=75 rows=20 wrap="off"></textarea>
+      </div>
+      <div style="width: 200px; float:right; height: 400px; margin: 10px">
+        <h3>Tet</h3>
+      </div-->
+
+      <div class="row">
+        <div class="col-md-8">
+          <!--textarea id="messageArea" name="messageArea" cols=75 rows=20 wrap="off"></textarea-->
+          <textarea class="form-control" id="messageArea" name="messageArea" rows="20"></textarea>
+        </div>
+        <div class="col-md-4">
+          <h3>Message Types to Capture{{.UserGetResponse}}</h3>
+          <hr/>
+          <h5>Users:</h5>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="UserGetResponse" onclick="messageTypeToggled('UserGetResponse')" {{if .UserGetResponse}}checked{{end}}>
+            <label class="form-check-label" for="UserGetResponse">GET /scim/v2/Users&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="UserPostRequest" onclick="messageTypeToggled('UserPostRequest')" {{if .UserPostRequest}}checked{{end}}>
+            <label class="form-check-label" for="UserPostRequest">POST /scim/v2/Users&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">request message</span></label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="UserPostResponse" onclick="messageTypeToggled('UserPostResponse')" {{if .UserPostResponse}}checked{{end}}>
+            <label class="form-check-label" for="UserPostResponse">POST /scim/v2/Users&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="UserIdGetResponse" onclick="messageTypeToggled('UserIdGetResponse')" {{if .UserIdGetResponse}}checked{{end}}>
+            <label class="form-check-label" for="UserIdGetResponse">GET /scim/v2/Users/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="UserIdPutRequest" onclick="messageTypeToggled('UserIdPutRequest')" {{if .UserIdPutRequest}}checked{{end}}>
+            <label class="form-check-label" for="UserIdPutRequest">PUT /scim/v2/Users/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">request message</span></label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="UserIdPutResponse" onclick="messageTypeToggled('UserIdPutResponse')" {{if .UserIdPutResponse}}checked{{end}}>
+            <label class="form-check-label" for="UserIdPutResponse">PUT /scim/v2/Users/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="UserIdPatchRequest" onclick="messageTypeToggled('UserIdPatchRequest')" {{if .UserIdPatchRequest}}checked{{end}}>
+            <label class="form-check-label" for="UserIdPatchRequest">PATCH /scim/v2/Users/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">request message</span></label>
+          </div>
+          <!--div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="UserIdPatchResponse" onclick="messageTypeToggled('UserIdPatchResponse')">
+            <label class="form-check-label" for="UserIdPatchResponse">PATCH /scim/v2/Users/&lt;id&gt;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
+          </div-->
+          <hr/>
+          <h5>Groups:</h5>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="GroupsGetResponse" onclick="messageTypeToggled('GroupsGetResponse')" {{if .GroupsGetResponse}}checked{{end}}>
+            <label class="form-check-label" for="GroupsGetResponse">GET /scim/v2/Groups&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="GroupsPostRequest" onclick="messageTypeToggled('GroupsPostRequest')" {{if .GroupsPostRequest}}checked{{end}}>
+            <label class="form-check-label" for="GroupsPostRequest">POST /scim/v2/Groups&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">request message</span></label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="GroupsPostResponse" onclick="messageTypeToggled('GroupsPostResponse')" {{if .GroupsPostResponse}}checked{{end}}>
+            <label class="form-check-label" for="GroupsPostResponse">POST /scim/v2/Groups&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="GroupsIdGetResponse" onclick="messageTypeToggled('GroupsIdGetResponse')" {{if .GroupsIdGetResponse}}checked{{end}}>
+            <label class="form-check-label" for="UserIdGetGroupsIdGetResponseResponse">GET /scim/v2/Groups/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="GroupsIdPutRequest" onclick="messageTypeToggled('GroupsIdPutRequest')" {{if .GroupsIdPutRequest}}checked{{end}}>
+            <label class="form-check-label" for="GroupsIdPutRequest">PUT /scim/v2/Groups/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">request message</span></label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="GroupsIdPutResponse" onclick="messageTypeToggled('GroupsIdPutResponse')" {{if .GroupsIdPutResponse}}checked{{end}}>
+            <label class="form-check-label" for="GroupsIdPutResponse">PUT /scim/v2/Groups/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="GroupsIdPatchRequest" onclick="messageTypeToggled('GroupsIdPatchRequest')" {{if .GroupsIdPatchRequest}}checked{{end}}>
+            <label class="form-check-label" for="GroupsIdPatchRequest">PATCH /scim/v2/Groups/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">request message</span></label>
+          </div>
+        </div>
+      </div>
+
       <p><input type="hidden" id="uuid" name="uuid" value=""></p>
-      <p><input type="submit" value="Send" onclick="submitMessage();return false"/></p>
+      <p><input type="submit" id="submitMsg" value="Send" class="btn btn-outline-success" onclick="submitMessage();return false"/></p>
     </fieldset>
   </form>
 

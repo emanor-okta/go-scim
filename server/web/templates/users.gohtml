@@ -2,17 +2,77 @@
 
 
 <div id="content" class="ui text container">
-  <h2>Okta SAML Assertion Flow Example</h2>
+  <h2>Users</h2>
 
+  {{$active := .PP.CurrentPage}}
+  {{$pageCount := .PP.PageCount}}
+
+  {{ if gt $pageCount 0 }}
+  <nav aria-label="Page navigation example">
+    <ul class="pagination justify-content-center">
+      {{/* {{$active := .PP.CurrentPage}}
+      {{$pageCount := .PP.PageCount}} */}}
+      <li class="page-item {{ if eq 1 $active }}disabled{{ end }}">
+        {{$previous := .PP.PreviousPage}}
+        <a class="page-link" href="/users?page={{$previous}}" aria-label="Previous">
+          <span aria-hidden="true">&laquo;</span>
+        </a>
+      </li>
+      {{range $page := .PP.Pagination}}
+        <li class="page-item {{ if eq $page $active }}active{{ end }}"><a class="page-link" href="/users?page={{$page}}">{{$page}}</a></li>
+      {{end}}
+      <li class="page-item {{ if eq $pageCount $active }}disabled{{ end }}">
+        {{$next := .PP.NextPage}}
+        <a class="page-link" href="/users?page={{$next}}" aria-label="Next">
+          <span aria-hidden="true">&raquo;</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+  {{ end }}
+  
   <div>
-    <p>Users</p>
-    
+    <div class="accordion accordion-flush" id="accordionFlushExample">
+      {{range $i, $user := .Users}}
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="flush-heading-{{$i}}">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#flush-collapse-{{$i}}" aria-expanded="false" aria-controls="flush-collapse-{{$i}}">
+              {{$user.Username}}
+            </button>
+          </h2>
+          <div id="flush-collapse-{{$i}}" class="accordion-collapse collapse" aria-labelledby="flush-heading-{{$i}}" data-bs-parent="#accordionFlushExample">
+            <div class="accordion-body">
+              <textarea class="form-control" id="messageArea" name="messageArea" rows="20">{{$user.Json}}</textarea>
+            </div>
+          </div>
+        </div>
+      {{end}}
+    </div>
   </div>
 
-  <!--form method="get" action="login">
-    <button id="login-button" class="btn btn-primary" type="submit">Login</button>
-  </form-->
-
+  {{ if and (ne $pageCount $active) (gt $pageCount 0) }}
+  <nav aria-label="Page navigation example">
+    <ul class="pagination justify-content-center">
+      {{/* {{$active := .PP.CurrentPage}}
+      {{$pageCount := .PP.PageCount}} */}}
+      <li class="page-item {{ if eq 1 $active }}disabled{{ end }}">
+        {{$previous := .PP.PreviousPage}}
+        <a class="page-link" href="/users?page={{$previous}}" aria-label="Previous">
+          <span aria-hidden="true">&laquo;</span>
+        </a>
+      </li>
+      {{range $page := .PP.Pagination}}
+        <li class="page-item {{ if eq $page $active }}active{{ end }}"><a class="page-link" href="/users?page={{$page}}">{{$page}}</a></li>
+      {{end}}
+      <li class="page-item {{ if eq $pageCount $active }}disabled{{ end }}">
+        {{$next := .PP.NextPage}}
+        <a class="page-link" href="/users?page={{$next}}" aria-label="Next">
+          <span aria-hidden="true">&raquo;</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+  {{ end }}
 
 
 </div>

@@ -25,6 +25,7 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 	// 	return
 	// }
 	res.Header().Add("content-type", content_type)
+	path := "/scim/v2/Users"
 
 	if req.Method == http.MethodGet {
 		// GET
@@ -36,19 +37,21 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 
 		if q.filter.userName != "" {
 			// ?filter=username eq <username>
+			path = fmt.Sprintf("%s?filter=username eq %s&startIndex=%v&count=%v", path, q.filter.userName, q.startIndex, q.count)
 			user, err := utils.GetUserByFilter(q.filter.userName)
 			if err != nil {
-				handleEmptyListReturn(&res, err)
+				handleEmptyListReturn(&res, err, &reqFilter, fmt.Sprintf("GET %s  -  Response", path))
 				return
 			}
 			docs = []interface{}{}
 			docs = append(docs.([]interface{}), user)
 		} else {
 			// ?startIndex=<?>&count=<?>
+			path = fmt.Sprintf("%s?startIndex=%v&count=%v", path, q.startIndex, q.count)
 			var err error
 			docs, err = utils.GetUsersByRange(q.startIndex, q.count)
 			if err != nil {
-				handleEmptyListReturn(&res, err)
+				handleEmptyListReturn(&res, err, &reqFilter, fmt.Sprintf("GET %s  -  Response", path))
 				return
 			}
 		}
@@ -58,7 +61,7 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 		// users = reqFilter.UserGetResponse(users) <-- change to use v2.ListResponse below
 
 		lr := buildListResponse(users)
-		reqFilter.UserGetResponse(&lr)
+		reqFilter.UserGetResponse(&lr, fmt.Sprintf("GET %s  -  Response", path))
 
 		j, err := json.Marshal(&lr)
 		if err != nil {
@@ -67,6 +70,7 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 
 		res.WriteHeader(http.StatusOK)
 		res.Write(j)
+
 	} else if req.Method == http.MethodPost {
 		// POST
 		b, err := getBody(req)
@@ -90,7 +94,7 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 		m["id"] = uuid
 		doc, _ := json.Marshal(m)
 
-		doc = reqFilter.UserPostRequest(doc)
+		doc = reqFilter.UserPostRequest(doc, fmt.Sprintf("POST %s  -  Request", path))
 
 		if err = utils.AddUser(doc, m["userName"].(string), uuid); err != nil {
 			if err.Error() == "user_already_exists" {
@@ -101,7 +105,7 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		doc = reqFilter.UserPostResponse(doc)
+		doc = reqFilter.UserPostResponse(doc, fmt.Sprintf("POST %s  -  Response", path))
 
 		res.WriteHeader(http.StatusCreated)
 		if _, err = res.Write(doc); err != nil {
@@ -128,6 +132,7 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	uuid := parts[3]
+	path := fmt.Sprintf("/scim/v2/Users/%s", uuid)
 
 	if req.Method == http.MethodDelete {
 		// DELETE (not used by Okta)
@@ -152,7 +157,7 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 
 		user := embedUsersGroups([]interface{}{doc})
 
-		user[0] = reqFilter.UserIdGetResponse(user[0].(string))
+		user[0] = reqFilter.UserIdGetResponse(user[0].(string), fmt.Sprintf("GET %s  -  Response", path))
 
 		res.WriteHeader(http.StatusOK)
 		res.Write([]byte(user[0].(string)))
@@ -166,7 +171,7 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 
 		if req.Method == http.MethodPut {
 			// PUT
-			b = reqFilter.UserIdPutRequest(b)
+			b = reqFilter.UserIdPutRequest(b, fmt.Sprintf("PUT %s  -  Request", path))
 
 			var m map[string]interface{}
 			json.Unmarshal(b, &m)
@@ -180,7 +185,7 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			b = reqFilter.UserIdPutResponse(b)
+			b = reqFilter.UserIdPutResponse(b, fmt.Sprintf("PUT %s  -  Response", path))
 
 			res.WriteHeader(http.StatusOK)
 			if _, err = res.Write(b); err != nil {
@@ -195,7 +200,7 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			reqFilter.UserIdPatchRequest(&ops)
+			reqFilter.UserIdPatchRequest(&ops, fmt.Sprintf("PATCH %s  -  Request", path))
 
 			patchUser := utils.UserPatch{}
 			for _, v := range ops.Operations {

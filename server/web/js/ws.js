@@ -13,6 +13,7 @@ function intiializeWS() {
     socket.onmessage = onMessage;
     socket.onclose = onClose;
     socket.onerror = onError;
+    document.getElementById('submitMsg').disabled = true;
 }
 
 function onMessage(event) {
@@ -44,14 +45,19 @@ function displayNextMessage() {
     var data = messages[0];
     var obj = JSON.parse(data);
     var uuid = obj.uuid;
-    console.log(uuid);
+    var reqType = obj.requestType;
+    console.log(uuid + " : " + reqType);
     delete obj.uuid;
+    delete obj.requestType;
     var str = JSON.stringify(obj, undefined, 4);
     document.getElementById('messageArea').value = str;
     document.getElementById('uuid').value = uuid;
+    document.getElementById('reqType').innerText = reqType;
+    document.getElementById('submitMsg').disabled = false;
 }
 
 function submitMessage() {
+    document.getElementById('submitMsg').disabled = true;
     var uuid = document.getElementById('uuid').value;
     var msg = document.getElementById('messageArea').value;
     var obj = JSON.parse(msg);
@@ -59,6 +65,7 @@ function submitMessage() {
     var str = JSON.stringify(obj);
     document.getElementById('messageArea').value = "";
     document.getElementById('uuid').value = "";
+    document.getElementById('reqType').innerText = "";
     sendMessage(str);
     messages.shift();
     if (messages.length > 0) {

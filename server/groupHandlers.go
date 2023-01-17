@@ -17,6 +17,7 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 	// 	return
 	// }
 	res.Header().Add("content-type", content_type)
+	path := "/scim/v2/Groups"
 
 	if req.Method == http.MethodGet {
 		// GET
@@ -28,19 +29,21 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 
 		if q.filter.displayName != "" {
 			// ?filter=displayName eq <group name>
+			path = fmt.Sprintf("%s?filter=displayName eq %s&startIndex=%v&count=%v", path, q.filter.displayName, q.startIndex, q.count)
 			g, err := utils.GetGroupByFilter(q.filter.displayName)
 			if err != nil {
-				handleEmptyListReturn(&res, err)
+				handleEmptyListReturn(&res, err, &reqFilter, fmt.Sprintf("GET %s  -  Response", path))
 				return
 			}
 			grps = []interface{}{g}
 		} else {
 			// ?startIndex=<?>&count=<?>
+			path = fmt.Sprintf("%s?startIndex=%v&count=%v", path, q.startIndex, q.count)
 			var err error
 			grps, err = utils.GetGroupsByRange(q.startIndex, q.count)
 			if err != nil {
 				log.Printf("\n%v\n\n", err)
-				handleEmptyListReturn(&res, err)
+				handleEmptyListReturn(&res, err, &reqFilter, fmt.Sprintf("GET %s  -  Response", path))
 				return
 			}
 		}
@@ -49,7 +52,7 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 		// reqFilter.GroupsGetResponse(groups) <-- change to pass v2.ListResponse
 
 		lr := buildListResponse(groups)
-		reqFilter.GroupsGetResponse(&lr)
+		reqFilter.GroupsGetResponse(&lr, fmt.Sprintf("GET %s  -  Response", path))
 
 		j, err := json.Marshal(&lr)
 		if err != nil {
@@ -81,7 +84,7 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 		m["meta"] = meta
 		m["id"] = uuid
 
-		reqFilter.GroupsPostRequest(m)
+		reqFilter.GroupsPostRequest(m, fmt.Sprintf("POST %s  -  Request", path))
 		ids, mems := buildGroupsMembersList(m["members"].([]interface{}))
 
 		b, _ = json.Marshal(m)
@@ -98,7 +101,7 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		b = reqFilter.GroupsPostResponse(b)
+		b = reqFilter.GroupsPostResponse(b, fmt.Sprintf("POST %s  -  Response", path))
 		res.WriteHeader(http.StatusCreated)
 		res.Write(b)
 	} else {
@@ -122,6 +125,7 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	uuid := parts[3]
+	path := fmt.Sprintf("/scim/v2/Groups/%s", uuid)
 
 	if req.Method == http.MethodDelete {
 		// DELETE
@@ -142,7 +146,7 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 		}
 
 		groups := embedGroupsMembers([]interface{}{grp})
-		groups[0] = reqFilter.GroupsIdGetResponse(groups[0])
+		groups[0] = reqFilter.GroupsIdGetResponse(groups[0], fmt.Sprintf("GET %s  -  Response", path))
 		res.WriteHeader(http.StatusOK)
 		// res.Write([]byte(groups[0].(string)))
 		res.Write(groups[0].([]byte))
@@ -169,7 +173,7 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 			m["meta"] = meta
 			m["id"] = uuid
 
-			reqFilter.GroupsIdPutRequest(m)
+			reqFilter.GroupsIdPutRequest(m, fmt.Sprintf("PUT %s  -  Request", path))
 			ids, mems := buildGroupsMembersList(m["members"].([]interface{}))
 
 			b, _ = json.Marshal(m)
@@ -186,7 +190,7 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			b = reqFilter.GroupsIdPutResponse(b)
+			b = reqFilter.GroupsIdPutResponse(b, fmt.Sprintf("PUT %s  -  Response", path))
 
 			res.WriteHeader(http.StatusOK)
 			res.Write(b)
@@ -199,7 +203,7 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			reqFilter.GroupsIdPatchRequest(&ops)
+			reqFilter.GroupsIdPatchRequest(&ops, fmt.Sprintf("PATCH %s  -  Request", path))
 
 			// process list of operations  ** TODO - Should this be run in a single transaction ?? **
 			for _, o := range ops.Operations {

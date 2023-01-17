@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 
 	"github.com/emanor-okta/go-scim/filters"
@@ -79,7 +80,31 @@ func StartServer(config *utils.Configuration) {
 		web.StartWebServer(config)
 	}
 
-	if err := http.ListenAndServe(config.Server.Address, nil); err != nil {
+	// if err := http.ListenAndServe(config.Server.Address, nil); err != nil {
+	// 	log.Fatalf("Server startup failed: %s\n", err)
+	// }
+
+	f := func(conn net.Conn, connState http.ConnState) {
+		if connState == http.StateIdle {
+			// fmt.Printf(">>>> ConnState Callback %v <<<<<\n", connState)
+			// hack to fix ngrok not reusing established connections (a guess)
+			err := conn.Close()
+			if err != nil {
+				log.Printf("ConnState callback failed to close idle connection: %v\n", err)
+			}
+		}
+
+	}
+	s := &http.Server{
+		Addr: config.Server.Address,
+		// Handler:        myHandler,
+		// ReadTimeout:    10 * time.Second,
+		// WriteTimeout:   10 * time.Second,
+		// MaxHeaderBytes: 1 << 20,
+		ConnState: f,
+	}
+	log.Fatal(s.ListenAndServe())
+	if err := s.ListenAndServe(); err != nil {
 		log.Fatalf("Server startup failed: %s\n", err)
 	}
 }
@@ -142,9 +167,10 @@ func handleErrorForKeyLookup(res *http.ResponseWriter, err error, id string) {
 	// (*res).Write(nil)
 }
 
-func handleEmptyListReturn(res *http.ResponseWriter, err error) {
+func handleEmptyListReturn(res *http.ResponseWriter, err error, filter *utils.ReqFilter, path string) {
 	if err.Error() == NOT_FOUND {
 		lr := buildListResponse([]interface{}{})
+		(*filter).UserGetResponse(&lr, path)
 		j, err := json.Marshal(&lr)
 		if err != nil {
 			log.Fatalf("Error Marshalling ListResponse: %v\n", err)

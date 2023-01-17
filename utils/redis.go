@@ -145,6 +145,15 @@ func getByUUID(uuid, embedded_key string) (interface{}, error) {
 	return result, nil
 }
 
+func FlushDB() error {
+	status := rdb.FlushDB(ctx)
+	if status.Err() != nil {
+		return status.Err()
+	}
+
+	return nil
+}
+
 /*
  * User specific functions
  */
@@ -220,6 +229,15 @@ func PatchUser(uuid string, userPatch UserPatch) error {
 		return errors.New("not_found")
 	}
 	return nil
+}
+
+func GetUserCount() (int64, error) {
+	intCmd := rdb.LLen(ctx, USERS_KEY)
+	if intCmd.Err() != nil {
+		return 0, intCmd.Err()
+	}
+
+	return intCmd.Val(), nil
 }
 
 /*
@@ -335,6 +353,15 @@ func UpdateGroupName(uuid string, name string) error {
 		return err
 	}
 	return nil
+}
+
+func GetGroupCount() (int64, error) {
+	intCmd := rdb.LLen(ctx, GROUPS_KEY)
+	if intCmd.Err() != nil {
+		return 0, intCmd.Err()
+	}
+
+	return intCmd.Val(), nil
 }
 
 // func Test(user []byte) {

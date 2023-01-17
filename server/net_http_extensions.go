@@ -32,6 +32,8 @@ func (lrw LoggerResponseWriter) Write(b []byte) (int, error) {
 			// fmt.Printf("%s\n", buf.String())
 			messageLogs.AddResponse(fmt.Sprintf("%p", lrw.R), buf.String())
 		}
+	} else {
+		messageLogs.AddResponse(fmt.Sprintf("%p", lrw.R), "")
 	}
 	return lrw.RW.Write(b)
 }
@@ -39,5 +41,6 @@ func (lrw LoggerResponseWriter) Write(b []byte) (int, error) {
 func (lrw LoggerResponseWriter) WriteHeader(statusCode int) {
 	// fmt.Println(">>>>>>>Using LoggerResponseWriter WriteHeader<<<<<<<")
 	// fmt.Printf("%v\n", statusCode)
+	messageLogs.AddResponseStatus(fmt.Sprintf("%p", lrw.R), statusCode)
 	lrw.RW.WriteHeader(statusCode)
 }

@@ -1,22 +1,81 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"path"
+	"strconv"
+	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 
 	"github.com/emanor-okta/go-scim/filters"
+	messageLogs "github.com/emanor-okta/go-scim/server/log"
+	v2 "github.com/emanor-okta/go-scim/types/v2"
 	"github.com/emanor-okta/go-scim/utils"
 )
+
+const items_per_page = 25
+const items_per_page_messages = 100
 
 var tpl *template.Template
 var config *utils.Configuration
 var wsConn *websocket.Conn
 var manualFilter filters.ManualFilter
+var filterMutex sync.Mutex
+var filterId int
+
+type PagePagination struct {
+	Pagination   []int
+	CurrentPage  int
+	NextPage     int
+	PreviousPage int
+	PageCount    int
+}
+
+type UserTmpl struct {
+	Username string
+	Json     string
+}
+
+type UsersTmpl struct {
+	Users []UserTmpl
+	Count int
+	PP    PagePagination
+	Error error
+}
+
+type GroupTmpl struct {
+	GroupName string
+	Json      string
+}
+
+type GroupsTmpl struct {
+	Groups []GroupTmpl
+	Count  int
+	PP     PagePagination
+	Error  error
+}
+
+// type MessageTmpl struct {
+// TimeStamp string
+// Method    string
+// Url       string
+// Json      string
+
+// }
+
+type MessagessTmpl struct {
+	Messages []messageLogs.Message
+	Count    int
+	PP       PagePagination
+	Error    error
+}
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -33,9 +92,12 @@ func StartWebServer(c *utils.Configuration) {
 	http.HandleFunc("/groups", handleGroups)
 	http.HandleFunc("/filters/ws", handleWebSocketUpgrade)
 	http.HandleFunc("/filters", handleFilters)
+	http.HandleFunc("/filters/toggle", handleToggleFilter)
 	http.HandleFunc("/config", handleConfig)
 	http.HandleFunc("/js/ws.js", handleJavascript)
-	// http.HandleFunc("/", handleMessages)
+	http.HandleFunc("/js/ui.js", handleJavascript)
+	http.HandleFunc("/redis/flush", handleFlush)
+	http.HandleFunc("/messages/flush", handleFlush)
 
 	// fmt.Printf("Starting Web Console on %v\n", config.Server.Web_address)
 	// if err := http.ListenAndServe(config.Server.Web_address, nil); err != nil {
@@ -43,14 +105,14 @@ func StartWebServer(c *utils.Configuration) {
 	// }
 
 	//TEST
-	m := map[filterType]filter{}
-	i := []instruction{}
-	i = append(i, instruction{jsonPath: ".key2.inner_key2[1]", op: modify, value: "nothing"})
-	i = append(i, instruction{jsonPath: ".", op: delete})
-	i = append(i, instruction{jsonPath: ".keyArray[5].inner_keyO.arr[99]", op: modify, value: "arrayVal"})
-	i = append(i, instruction{jsonPath: ".", op: modify, value: "{\"key\": \"val1\"}"})
-	m[UserPostRequest] = filter{fType: UserPostRequest, instructions: i}
-	GenerateSource(m)
+	// m := map[filterType]filter{}
+	// i := []instruction{}
+	// i = append(i, instruction{jsonPath: ".key2.inner_key2[1]", op: modify, value: "nothing"})
+	// i = append(i, instruction{jsonPath: ".", op: delete})
+	// i = append(i, instruction{jsonPath: ".keyArray[5].inner_keyO.arr[99]", op: modify, value: "arrayVal"})
+	// i = append(i, instruction{jsonPath: ".", op: modify, value: "{\"key\": \"val1\"}"})
+	// m[UserPostRequest] = filter{fType: UserPostRequest, instructions: i}
+	// GenerateSource(m)
 	/*
 		type instruction struct {
 		jsonPath string
@@ -67,22 +129,102 @@ func StartWebServer(c *utils.Configuration) {
 
 func handleMessages(res http.ResponseWriter, req *http.Request) {
 	fmt.Println("Returning Messages")
-	tpl.ExecuteTemplate(res, "messages.gohtml", nil)
+	page := req.URL.Query().Get("page")
+	start, current := getPaginationPage(page, items_per_page_messages)
+	i, _ := strconv.Atoi(start)
+	messages, totalMessages := messageLogs.GetMessages(i-1, items_per_page_messages)
+	messagesTmpl := MessagessTmpl{Messages: messages}
+	messagesTmpl.Count = len(messages)
+	messagesTmpl.PP = computePagePagination(current, totalMessages, items_per_page_messages)
+
+	err := tpl.ExecuteTemplate(res, "messages.gohtml", messagesTmpl)
+	if err != nil {
+		log.Printf("Render Error: \"messages.gohtml\": %v\n", err)
+	}
 }
 
 func handleUsers(res http.ResponseWriter, req *http.Request) {
 	fmt.Println("Returning Users")
-	tpl.ExecuteTemplate(res, "users.gohtml", nil)
+	totalUserCount, err := utils.GetUserCount()
+	if err != nil {
+		usersTmpl := UsersTmpl{Error: err}
+		tpl.ExecuteTemplate(res, "users.gohtml", usersTmpl)
+	}
+	fmt.Println(totalUserCount)
+	page := req.URL.Query().Get("page")
+	start, current := getPaginationPage(page, items_per_page)
+	fmt.Println("2 ")
+	usersTmpl := getUsers(start, fmt.Sprintf("%d", items_per_page))
+	fmt.Println("3 ")
+	usersTmpl.PP = computePagePagination(current, int(totalUserCount), items_per_page)
+	fmt.Println("4 ")
+	err = tpl.ExecuteTemplate(res, "users.gohtml", usersTmpl)
+	if err != nil {
+		log.Printf("Render Error: \"users.gohtml\": %v\n", err)
+	}
 }
 
 func handleGroups(res http.ResponseWriter, req *http.Request) {
 	fmt.Println("Returning Groups")
-	tpl.ExecuteTemplate(res, "groups.gohtml", nil)
+	totalGroupCount, err := utils.GetGroupCount()
+	if err != nil {
+		groupsTmpl := GroupsTmpl{Error: err}
+		tpl.ExecuteTemplate(res, "groups.gohtml", groupsTmpl)
+	}
+
+	page := req.URL.Query().Get("page")
+	start, current := getPaginationPage(page, items_per_page)
+	groupsTmpl := getGroups(start, fmt.Sprintf("%d", items_per_page))
+	groupsTmpl.PP = computePagePagination(current, int(totalGroupCount), items_per_page)
+
+	err = tpl.ExecuteTemplate(res, "groups.gohtml", groupsTmpl)
+	if err != nil {
+		log.Printf("Render Error: \"groups.gohtml\": %v\n", err)
+	}
 }
 
 func handleFilters(res http.ResponseWriter, req *http.Request) {
 	fmt.Println("Returning Filters")
-	tpl.ExecuteTemplate(res, "filters.gohtml", nil)
+	filterMutex.Lock()
+	manualFilter = filters.ManualFilter{Config: config, WsConn: nil, ReqMap: make(map[string]chan interface{}, 0)}
+	*config.ReqFilter = &manualFilter
+	filterId++
+	filterMutex.Unlock()
+
+	err := tpl.ExecuteTemplate(res, "filters.gohtml", config.WebMessageFilter)
+	if err != nil {
+		fmt.Printf("%+v\n", err)
+	}
+}
+
+func handleFlush(res http.ResponseWriter, req *http.Request) {
+	epoch := req.URL.Query().Get("epoch")
+	epoch64, err := strconv.ParseInt(epoch, 10, 64)
+	if err != nil {
+		log.Panicf("Error converting epoch query param to int64: %v\n", err)
+		epoch64 = 0
+	}
+	now := time.Now()
+	// fmt.Printf("%v ~= %v\n", epoch, now.UnixMilli())
+	if now.UnixMilli()-epoch64 < 3000 {
+		fmt.Printf("PATH: %s\n", req.URL.Path)
+		if req.URL.Path == "/redis/flush" {
+			fmt.Println("Flushing Redis")
+			err := utils.FlushDB()
+			if err != nil {
+				res.WriteHeader(http.StatusForbidden)
+			} else {
+				res.WriteHeader(http.StatusOK)
+			}
+		} else if req.URL.Path == "/messages/flush" {
+			fmt.Println("Flushing Messages")
+			messageLogs.FlushMessages()
+			res.WriteHeader(http.StatusOK)
+		}
+	} else {
+		res.WriteHeader(http.StatusForbidden)
+	}
+	res.Write(nil)
 }
 
 func handleWebSocketUpgrade(res http.ResponseWriter, req *http.Request) {
@@ -97,24 +239,13 @@ func handleWebSocketUpgrade(res http.ResponseWriter, req *http.Request) {
 	}
 
 	wsConn = conn
-	manualFilter = filters.ManualFilter{Config: config, WsConn: wsConn, ReqMap: make(map[string]chan interface{}, 0)}
-	*config.ReqFilter = &manualFilter
-	manualFilter.Config.WebMessageFilter.UserPostRequest = true // !!!! TESTING
+	// manualFilter = filters.ManualFilter{Config: config, WsConn: wsConn, ReqMap: make(map[string]chan interface{}, 0)}
+	// *config.ReqFilter = &manualFilter
 
+	(*config.ReqFilter).(*filters.ManualFilter).WsConn = wsConn
 	log.Println("Client Connected")
-	// var m map[string]interface{}
-	// m = make(map[string]interface{}, 1)
-	// m["id"] = 99
-	// m["object"] = make(map[string]interface{})
-	// m["object"].(map[string]interface{})["key1"] = "value 1"
-	// m["object"].(map[string]interface{})["key2"] = [4]int{1, 2, 3, 4}
-	// if err := conn.WriteJSON(m); err != nil {
-	// 	log.Println(err)
-	// }
-
 	// listen indefinitely for new messages coming
 	// through on our WebSocket connection
-	// go writer(ws)
 	go wsReader()
 }
 
@@ -124,14 +255,39 @@ func handleConfig(res http.ResponseWriter, req *http.Request) {
 }
 
 func handleJavascript(res http.ResponseWriter, req *http.Request) {
-	fmt.Println("Returning JavaScript")
+	//fmt.Println(req.URL.Path)
 	res.Header().Set("Content-Type", "application/javascript")
-	fp := path.Join("server", "web", "js", "ws.js")
+	var fp string
+	if req.URL.Path == "/js/ws.js" {
+		fp = path.Join("server", "web", "js", "ws.js")
+	} else {
+		fp = path.Join("server", "web", "js", "ui.js")
+	}
+
 	http.ServeFile(res, req, fp)
 	tpl.ExecuteTemplate(res, "config.gohtml", nil)
 }
 
+func handleToggleFilter(res http.ResponseWriter, req *http.Request) {
+	reqType := req.URL.Query().Get("requestType")
+	state, err := strconv.ParseBool(req.URL.Query().Get("enabled"))
+	if err != nil {
+		log.Printf("handleToggleFilter.ParseBool() failed: %v\n", err)
+		res.WriteHeader(500)
+		res.Write(nil)
+		return
+	}
+
+	manualFilter.ToggleFilter(reqType, state)
+	res.WriteHeader(200)
+	res.Write(nil)
+}
+
 func wsReader() {
+	filterMutex.Lock()
+	filterId_ := filterId
+	filterMutex.Unlock()
+
 	for {
 		// read in a message
 		fmt.Println("WebSocket Reader about to block for Message")
@@ -140,10 +296,15 @@ func wsReader() {
 		if err != nil {
 			log.Printf("wsConn.ReadJSON error: %v\n", err)
 			if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Println("Stopping Manual Filter, Setting Filter to Default Filter..")
-				*config.ReqFilter = filters.DefaultFilter{}
-				// create empty new filter to free up prior filter
-				manualFilter = filters.ManualFilter{}
+				filterMutex.Lock()
+				// fmt.Printf("filterId %v, filterId_ %v\n", filterId, filterId_)
+				if filterId == filterId_ {
+					log.Println("Stopping Manual Filter")
+					*config.ReqFilter = filters.DefaultFilter{}
+					// create empty new filter to free up prior filter
+					// manualFilter = filters.ManualFilter{}
+				}
+				filterMutex.Unlock()
 				return
 			}
 			continue
@@ -158,4 +319,114 @@ func wsReader() {
 			}
 		}
 	}
+}
+
+func getUsers(start, count string) UsersTmpl {
+	ut := UsersTmpl{}
+
+	lr, err := getListResponseResource(fmt.Sprintf("http://localhost:8082/scim/v2/Users?startIndex=%s&count=%s", start, count))
+	if err != nil {
+		ut.Error = err
+		return ut
+	}
+	ut.Count = lr.TotalResults
+	for _, v := range lr.Resources {
+		userName := v.(map[string]interface{})["userName"]
+		user, _ := json.MarshalIndent(v, "", "  ")
+		ut.Users = append(ut.Users, UserTmpl{Username: userName.(string), Json: string(user)})
+	}
+
+	return ut
+}
+
+func getGroups(start, count string) GroupsTmpl {
+	gt := GroupsTmpl{}
+
+	lr, err := getListResponseResource(fmt.Sprintf("http://localhost:8082/scim/v2/Groups?startIndex=%s&count=%s", start, count))
+	if err != nil {
+		gt.Error = err
+		return gt
+	}
+	gt.Count = lr.TotalResults
+	for _, v := range lr.Resources {
+		displayName := v.(map[string]interface{})["displayName"]
+		group, _ := json.MarshalIndent(v, "", "  ")
+		gt.Groups = append(gt.Groups, GroupTmpl{GroupName: displayName.(string), Json: string(group)})
+	}
+	return gt
+}
+
+func getListResponseResource(url string) (*v2.ListResponse, error) {
+	res, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		defer res.Body.Close()
+		var lResp v2.ListResponse
+		b, _ := io.ReadAll(res.Body)
+		err = json.Unmarshal(b, &lResp)
+		if err != nil {
+			return nil, err
+		}
+		return &lResp, nil
+	} else {
+		return nil, fmt.Errorf("%v", res.Status)
+	}
+}
+
+func computePagePagination(currentPage, itemCount, itemsPerPage int) PagePagination {
+	pp := PagePagination{CurrentPage: currentPage}
+	pp.NextPage = currentPage + 1
+	pp.PreviousPage = currentPage - 1
+
+	pp.PageCount = int(itemCount / itemsPerPage)
+	if int(itemCount%itemsPerPage) > 0 {
+		pp.PageCount++
+	}
+
+	if pp.PageCount <= 20 {
+		for i := 1; i <= pp.PageCount; i++ {
+			pp.Pagination = append(pp.Pagination, i)
+		}
+	} else {
+		for i := pp.CurrentPage; i <= pp.PageCount && i <= pp.CurrentPage+8; i++ {
+			pp.Pagination = append(pp.Pagination, i)
+		}
+		if pp.CurrentPage+8 < pp.PageCount {
+			pp.Pagination = append(pp.Pagination, pp.PageCount)
+		}
+		if pp.CurrentPage > 1 {
+			a := []int{}
+			for i := pp.CurrentPage - 1; i > 1 && i > pp.CurrentPage-9; i-- {
+				a = append(a, i)
+			}
+			a = append(a, 1)
+			for i, j := 0, len(a)-1; i < j; i, j = i+1, j-1 {
+				a[i], a[j] = a[j], a[i]
+			}
+			pp.Pagination = append(a, pp.Pagination...)
+		}
+	}
+
+	return pp
+}
+
+func getPaginationPage(page string, itemsPerPAge int) (string, int) {
+	start := "1"
+	current := 1
+	if page == "" || page == "1" {
+		page = "1"
+	} else {
+		i, err := strconv.Atoi(page)
+		if err != nil {
+			log.Printf("getPaginationPage.strconv.Atoi(page) Error: %v\n", err)
+		} else {
+			current = i
+			i = (i-1)*itemsPerPAge + 1
+			start = fmt.Sprintf("%d", i)
+		}
+	}
+
+	return start, current
 }

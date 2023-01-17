@@ -10,7 +10,7 @@ import (
 type SampleFilter struct {
 }
 
-func (f SampleFilter) UserPostRequest(doc []byte) []byte {
+func (f SampleFilter) UserPostRequest(doc []byte, path string) []byte {
 	fmt.Println("FILTER... UserPostRequest")
 	var m map[string]interface{}
 	json.Unmarshal(doc, &m)
@@ -22,7 +22,7 @@ func (f SampleFilter) UserPostRequest(doc []byte) []byte {
 	return d
 }
 
-func (f SampleFilter) UserPostResponse(doc []byte) []byte {
+func (f SampleFilter) UserPostResponse(doc []byte, path string) []byte {
 	fmt.Println("FILTER... UserPostResponse")
 	var m map[string]interface{}
 	json.Unmarshal(doc, &m)
@@ -41,14 +41,14 @@ func (f SampleFilter) UserPostResponse(doc []byte) []byte {
 // 	}
 // 	return doc
 // }
-func (f SampleFilter) UserGetResponse(lr *v2.ListResponse) {
+func (f SampleFilter) UserGetResponse(lr *v2.ListResponse, path string) {
 	fmt.Println("FILTER... UserGetResponse")
 	if len(lr.Resources) > 0 {
 		lr.Resources[0].(map[string]interface{})["userName"] = "UserGetResponse@filter.com"
 	}
 }
 
-func (f SampleFilter) UserIdPutRequest(doc []byte) []byte {
+func (f SampleFilter) UserIdPutRequest(doc []byte, path string) []byte {
 	fmt.Println("FILTER... UserIdPutRequest")
 	var m map[string]interface{}
 	json.Unmarshal(doc, &m)
@@ -60,7 +60,7 @@ func (f SampleFilter) UserIdPutRequest(doc []byte) []byte {
 	return d
 }
 
-func (f SampleFilter) UserIdPutResponse(doc []byte) []byte {
+func (f SampleFilter) UserIdPutResponse(doc []byte, path string) []byte {
 	fmt.Println("FILTER... UserIdPutResponse")
 	var m map[string]interface{}
 	json.Unmarshal(doc, &m)
@@ -72,7 +72,7 @@ func (f SampleFilter) UserIdPutResponse(doc []byte) []byte {
 	return d
 }
 
-func (f SampleFilter) UserIdPatchRequest(ops *v2.PatchOp) {
+func (f SampleFilter) UserIdPatchRequest(ops *v2.PatchOp, path string) {
 	fmt.Println("FILTER... UserIdPatchRequest")
 	for i, v := range ops.Operations {
 		val := v.Value.(map[string]interface{})
@@ -88,7 +88,7 @@ func (f SampleFilter) UserIdPatchRequest(ops *v2.PatchOp) {
 	}
 }
 
-func (f SampleFilter) UserIdPatchResponse(doc []byte) []byte {
+func (f SampleFilter) UserIdPatchResponse(doc []byte, path string) []byte {
 	fmt.Println("FILTER... UserIdPatchResponse")
 	var m map[string]interface{}
 	json.Unmarshal(doc, &m)
@@ -100,7 +100,7 @@ func (f SampleFilter) UserIdPatchResponse(doc []byte) []byte {
 	return d
 }
 
-func (f SampleFilter) UserIdGetResponse(doc string) string {
+func (f SampleFilter) UserIdGetResponse(doc string, path string) string {
 	fmt.Println("FILTER...  UserIdGetResponse")
 	var m map[string]interface{}
 	json.Unmarshal([]byte(doc), &m)
@@ -127,17 +127,17 @@ func (f SampleFilter) UserIdGetResponse(doc string) string {
 // 	g, _ := json.Marshal(m)
 // 	doc[0] = string(g)
 // }
-func (f SampleFilter) GroupsGetResponse(lr *v2.ListResponse) {
+func (f SampleFilter) GroupsGetResponse(lr *v2.ListResponse, path string) {
 	fmt.Println("FILTER...  GroupsGetResponse")
 	lr.Resources[0].(map[string]interface{})["displayName"] = "GroupsGetResponse Filter"
 }
 
-func (f SampleFilter) GroupsPostRequest(m map[string]interface{}) {
+func (f SampleFilter) GroupsPostRequest(m map[string]interface{}, path string) {
 	fmt.Println("FILTER...  GroupsPostRequest")
 	m["displayName"] = "Sample Filter Modification Before Redis Persistence"
 }
 
-func (f SampleFilter) GroupsPostResponse(doc []byte) []byte {
+func (f SampleFilter) GroupsPostResponse(doc []byte, path string) []byte {
 	fmt.Println("FILTER...  GroupsPostResponse")
 	var m map[string]interface{}
 	json.Unmarshal([]byte(doc), &m)
@@ -146,7 +146,7 @@ func (f SampleFilter) GroupsPostResponse(doc []byte) []byte {
 	return g
 }
 
-func (f SampleFilter) GroupsIdGetResponse(g interface{}) interface{} {
+func (f SampleFilter) GroupsIdGetResponse(g interface{}, path string) interface{} {
 	fmt.Println("FILTER...  GroupsIdGetResponse")
 	var m map[string]interface{}
 	json.Unmarshal([]byte(g.(string)), &m)
@@ -155,12 +155,12 @@ func (f SampleFilter) GroupsIdGetResponse(g interface{}) interface{} {
 	return g
 }
 
-func (f SampleFilter) GroupsIdPutRequest(m map[string]interface{}) {
+func (f SampleFilter) GroupsIdPutRequest(m map[string]interface{}, path string) {
 	fmt.Println("FILTER...  GroupsIdPutRequest")
 	m["displayName"] = "GroupsIdPutRequest Filter"
 }
 
-func (f SampleFilter) GroupsIdPutResponse(b []byte) []byte {
+func (f SampleFilter) GroupsIdPutResponse(b []byte, path string) []byte {
 	fmt.Println("FILTER...  GroupsIdPutResponse")
 	var m map[string]interface{}
 	json.Unmarshal(b, &m)
@@ -169,7 +169,7 @@ func (f SampleFilter) GroupsIdPutResponse(b []byte) []byte {
 	return g
 }
 
-func (f SampleFilter) GroupsIdPatchRequest(ops *v2.PatchOp) {
+func (f SampleFilter) GroupsIdPatchRequest(ops *v2.PatchOp, path string) {
 	fmt.Println("FILTER... GroupsIdPatchRequest")
 	for _, v := range ops.Operations {
 		if v.Op == v2.GROUP_REPLACE {
