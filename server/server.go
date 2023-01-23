@@ -26,8 +26,10 @@ var debugBody bool
 var debugQuery bool
 var logMessages bool
 var reqFilter utils.ReqFilter
+var config *utils.Configuration
 
-func StartServer(config *utils.Configuration) {
+func StartServer(c *utils.Configuration) {
+	config = c
 	debugHeaders = config.Server.Debug_headers
 	debugBody = config.Server.Debug_body
 	debugQuery = config.Server.Debug_query
@@ -44,30 +46,15 @@ func StartServer(config *utils.Configuration) {
 		// used to log to console
 		middlewares = append(middlewares, getHeadersMiddleware)
 	}
-	if logMessages {
-		// used for logging messages to web console
-		messageLogs.Init(config)
-		middlewares = append(middlewares, logMessagesMiddleware, logMessageResponseSudoMiddleware)
-	}
 
-	// TODO move to middlewre.go
-	// messageLogs.Init(config)
-	// middlewares = append(middlewares, func(h http.HandlerFunc) http.HandlerFunc {
-	// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	// 		lrw := LoggerResponseWriter{RW: w, R: r}
-	// 		h.ServeHTTP(lrw, r)
-	// 	})
-	// })
+	// used for logging messages to web console - Always init and add to middleware
+	messageLogs.Init()
+	middlewares = append(middlewares, logMessagesMiddleware, logMessageResponseSudoMiddleware)
 
 	http.HandleFunc("/scim/v2/Users", addMiddleware(handleUsers, middlewares...))
 	http.HandleFunc("/scim/v2/Users/", addMiddleware(handleUser, middlewares...))
 	http.HandleFunc("/scim/v2/Groups", addMiddleware(handleGroups, middlewares...))
 	http.HandleFunc("/scim/v2/Groups/", addMiddleware(handleGroup, middlewares...))
-
-	// http.HandleFunc("/scim/v1/Users", handleUsers)
-	// http.HandleFunc("/scim/v1/Users/", handleUser)
-	// http.HandleFunc("/scim/v1/Groups", handleGroups)
-	// http.HandleFunc("/scim/v1/Groups/", handleGroup)
 
 	/*
 	 * SET custome filter Here
@@ -84,10 +71,9 @@ func StartServer(config *utils.Configuration) {
 	// 	log.Fatalf("Server startup failed: %s\n", err)
 	// }
 
+	// hack to fix ngrok not reusing established connections (a guess)
 	f := func(conn net.Conn, connState http.ConnState) {
 		if connState == http.StateIdle {
-			// fmt.Printf(">>>> ConnState Callback %v <<<<<\n", connState)
-			// hack to fix ngrok not reusing established connections (a guess)
 			err := conn.Close()
 			if err != nil {
 				log.Printf("ConnState callback failed to close idle connection: %v\n", err)

@@ -6,8 +6,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/emanor-okta/go-scim/utils"
 )
 
 var inFlight map[string]Message
@@ -17,6 +15,7 @@ var rwLock sync.RWMutex
 
 type Message struct {
 	TimeStamp            time.Time
+	TimeStampResp        time.Time
 	Method               string
 	Response             int
 	ResponseStatusString string
@@ -26,22 +25,26 @@ type Message struct {
 	ResponseBody         string
 }
 
-func Init(config *utils.Configuration) {
+func Init() {
 	//TODO get message history length - for now grows until a crash?
 	messages = make([]Message, 0)
 	inFlight = make(map[string]Message)
 }
 
 func (m Message) FormatDate() string {
-	return m.TimeStamp.Format("Mon Jan 2 15:04:05.999")
+	// return m.TimeStamp.Format("Mon Jan 2 15:04:05.999")
+	return m.TimeStamp.Format("01/02/2006 15:04:05.999")
 }
 
 func (m Message) FormatMessage() string {
 	return fmt.Sprintf("------- Headers -------\n%s\n----- Request Body -----\n%s\n----- Response Body -----\n%s", m.Headers, m.RequestBody, m.ResponseBody)
 }
 
+func (m Message) FormatElapsedTime() string {
+	return fmt.Sprintf("%.4fms", (float64(m.TimeStampResp.UnixMilli()-m.TimeStamp.UnixMilli()))/1000.0)
+}
+
 func AddRequest(k string, m Message) {
-	// fmt.Printf("Key: %v, Message: %+v\n", k, m)
 	// if the request comes from web interface ignore
 	if strings.Contains(m.Headers, "Go-http-client/1.1") {
 		return
@@ -55,21 +58,18 @@ func AddResponse(k string, respBody string) {
 	rwLock.Lock()
 	if m, ok := inFlight[k]; ok {
 		m.ResponseBody = respBody
+		m.TimeStampResp = time.Now()
 		messages = append(messages, m)
 		delete(inFlight, k)
 	}
 	rwLock.Unlock()
-	// fmt.Println("MESSAGES::")
-	// for _, m := range messages {
-	// 	fmt.Printf("%+v\n", m)
-	// }
 }
 
 func AddResponseStatus(k string, status int) {
 	rwLock.Lock()
 	if m, ok := inFlight[k]; ok {
-		// fmt.Printf("Found >>>> %+v\n", m)
 		m.Response = status
+		m.TimeStampResp = time.Now()
 		m.ResponseStatusString = http.StatusText(status)
 		inFlight[k] = m
 	}
@@ -82,7 +82,6 @@ func GetInFlightMessages() map[string]Message {
 }
 
 func GetMessages(start, count int) ([]Message, int) {
-	// fmt.Printf("l: %v, [0]: %+v\n", len(messages), messages)
 	end := start + count
 	rwLock.RLock()
 	l := len(messages)

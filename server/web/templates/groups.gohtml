@@ -41,7 +41,16 @@
           </h2>
           <div id="flush-collapse-{{$i}}" class="accordion-collapse collapse" aria-labelledby="flush-heading-{{$i}}" data-bs-parent="#accordionFlushExample">
             <div class="accordion-body">
-              <textarea class="form-control" id="messageArea" name="messageArea" rows="20">{{$group.Json}}</textarea>
+              <textarea class="form-control" id="messageArea-{{$i}}" name="messageArea-{{$i}}" rows="20">{{$group.Json}}</textarea>
+              <form class="d-flex">
+                <fieldset>
+                  <p><input type="hidden" id="id-{{$i}}" name="id-{{$i}}" value="{{$group.Id}}"></p>
+                  <p>
+                    <input type="submit" id="updateGroupId-{{$i}}" value="Update" class="btn btn-outline-success" onclick="updateGroup({{$i}});return false"/>
+                    <input type="submit" id="deleteGroupId-{{$i}}" value="Delete" class="btn btn-outline-danger" onclick="deleteGroup({{$i}});return false"/>
+                  </p>
+                </fieldset>
+              </form>
             </div>
           </div>
         </div>

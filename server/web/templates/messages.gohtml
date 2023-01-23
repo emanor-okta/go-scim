@@ -2,7 +2,21 @@
 
 
 <div id="content" class="ui text container">
-  <h2>Messages</h2>
+  
+  <div class="container">
+  <div class="row">
+    <div class="col-8">
+      <h2>Messages</h2>
+    </div>
+    <div class="col-4">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="LogMessages" onclick="logMessagesToggled()" {{if .Enabled}}checked{{end}}>
+        <label class="form-check-label" for="LogMessages">Enable Message Logging</label>
+      </div>
+    </div>
+  </div>
+</div>
+  
 
   {{$active := .PP.CurrentPage}}
   {{$pageCount := .PP.PageCount}}
@@ -35,7 +49,7 @@
         <div class="accordion-item">
           <h2 class="accordion-header" id="flush-heading-{{$i}}">
             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#flush-collapse-{{$i}}" aria-expanded="false" aria-controls="flush-collapse-{{$i}}">
-              {{$message.FormatDate}}:&nbsp;&nbsp;<strong>  <span style="color:gray">{{$message.Method}}</span> <span style="color:black">&nbsp;&nbsp;{{$message.Response}}&nbsp;{{$message.ResponseStatusString}}</span> <span style="color:blue">&nbsp;&nbsp;{{$message.Url}}</span></strong>
+              {{$message.FormatDate}}:&nbsp;&nbsp;<strong>  <span style="color:gray">{{$message.Method}}</span> <span style="color:black">&nbsp;&nbsp;{{$message.Response}}&nbsp;{{$message.ResponseStatusString}}</span> <span style="color:blue">&nbsp;&nbsp;{{$message.Url}}</span>&nbsp;&nbsp;&nbsp;&nbsp;</strong>{{$message.FormatElapsedTime}}
             </button>
           </h2>
           <div id="flush-collapse-{{$i}}" class="accordion-collapse collapse" aria-labelledby="flush-heading-{{$i}}" data-bs-parent="#accordionFlushExample">

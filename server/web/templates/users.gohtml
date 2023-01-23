@@ -1,5 +1,6 @@
 {{template "header" .}}
 
+<script src="js/ui.js" type="text/javascript"></script>
 
 <div id="content" class="ui text container">
   <h2>Users</h2>
@@ -42,7 +43,16 @@
           </h2>
           <div id="flush-collapse-{{$i}}" class="accordion-collapse collapse" aria-labelledby="flush-heading-{{$i}}" data-bs-parent="#accordionFlushExample">
             <div class="accordion-body">
-              <textarea class="form-control" id="messageArea" name="messageArea" rows="20">{{$user.Json}}</textarea>
+              <textarea class="form-control" id="messageArea-{{$i}}" name="messageArea-{{$i}}" rows="20">{{$user.Json}}</textarea>
+              <form class="d-flex">
+                <fieldset>
+                  <p><input type="hidden" id="id-{{$i}}" name="id-{{$i}}" value="{{$user.Id}}"></p>
+                  <p>
+                    <input type="submit" id="updateUserId-{{$i}}" value="Update" class="btn btn-outline-success" onclick="updateUser({{$i}});return false"/>
+                    <input type="submit" id="deleteUserId-{{$i}}" value="Delete" class="btn btn-outline-danger" onclick="deleteUser({{$i}});return false"/>
+                  </p>
+                </fieldset>
+              </form>
             </div>
           </div>
         </div>

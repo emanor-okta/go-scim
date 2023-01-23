@@ -15,32 +15,31 @@ type LoggerResponseWriter struct {
 }
 
 func (lrw LoggerResponseWriter) Header() http.Header {
-	// fmt.Printf(">>>>>>>Using LoggerResponseWriter Header<<<<<<< %p\n", &lrw)
-	// fmt.Printf("%+v\n", lrw.RW.Header())
 	return lrw.RW.Header()
 }
 
 func (lrw LoggerResponseWriter) Write(b []byte) (int, error) {
-	// fmt.Printf(">>>>>>>Using LoggerResponseWriter<<<<<<< %p\n", lrw.R)
-	// test := fmt.Sprintf("%v", &lrw.R)
-	// fmt.Printf("test=%v, type=%T\n", test, test)
-	if b != nil && len(b) > 1 {
-		buf := bytes.Buffer{}
-		if err := json.Indent(&buf, b, "", "   "); err != nil {
-			fmt.Printf("Error Formatting JSON: %s\n", err)
+	if config.Server.Log_messages {
+		if b != nil && len(b) > 1 {
+			buf := bytes.Buffer{}
+			if err := json.Indent(&buf, b, "", "   "); err != nil {
+				fmt.Printf("Error Formatting JSON: %s\n", err)
+			} else {
+				// fmt.Printf("%s\n", buf.String())
+				messageLogs.AddResponse(fmt.Sprintf("%p", lrw.R), buf.String())
+			}
 		} else {
-			// fmt.Printf("%s\n", buf.String())
-			messageLogs.AddResponse(fmt.Sprintf("%p", lrw.R), buf.String())
+			messageLogs.AddResponse(fmt.Sprintf("%p", lrw.R), "")
 		}
-	} else {
-		messageLogs.AddResponse(fmt.Sprintf("%p", lrw.R), "")
 	}
+
 	return lrw.RW.Write(b)
 }
 
 func (lrw LoggerResponseWriter) WriteHeader(statusCode int) {
-	// fmt.Println(">>>>>>>Using LoggerResponseWriter WriteHeader<<<<<<<")
-	// fmt.Printf("%v\n", statusCode)
-	messageLogs.AddResponseStatus(fmt.Sprintf("%p", lrw.R), statusCode)
+	if config.Server.Log_messages {
+		messageLogs.AddResponseStatus(fmt.Sprintf("%p", lrw.R), statusCode)
+	}
+
 	lrw.RW.WriteHeader(statusCode)
 }

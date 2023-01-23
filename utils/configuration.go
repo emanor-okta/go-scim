@@ -24,7 +24,8 @@ type Configuration struct {
 		Log_messages  bool
 	}
 	Scim struct {
-		Enable_groups bool
+		Enable_groups     bool
+		ServerBaseAddress string
 	}
 	WebMessageFilter struct {
 		UserPostRequest      bool

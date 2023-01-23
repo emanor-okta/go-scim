@@ -1,10 +1,12 @@
 package web
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"path"
@@ -40,6 +42,7 @@ type PagePagination struct {
 
 type UserTmpl struct {
 	Username string
+	Id       string
 	Json     string
 }
 
@@ -52,6 +55,7 @@ type UsersTmpl struct {
 
 type GroupTmpl struct {
 	GroupName string
+	Id        string
 	Json      string
 }
 
@@ -75,6 +79,7 @@ type MessagessTmpl struct {
 	Count    int
 	PP       PagePagination
 	Error    error
+	Enabled  bool
 }
 
 var upgrader = websocket.Upgrader{
@@ -89,15 +94,20 @@ func StartWebServer(c *utils.Configuration) {
 
 	http.HandleFunc("/messages", handleMessages)
 	http.HandleFunc("/users", handleUsers)
+	http.HandleFunc("/users/update", handleUpdateUser)
+	http.HandleFunc("/users/delete", handleDeleteUser)
 	http.HandleFunc("/groups", handleGroups)
+	http.HandleFunc("/groups/update", handleUpdateGroup)
+	http.HandleFunc("/groups/delete", handleDeleteGroup)
 	http.HandleFunc("/filters/ws", handleWebSocketUpgrade)
 	http.HandleFunc("/filters", handleFilters)
 	http.HandleFunc("/filters/toggle", handleToggleFilter)
-	http.HandleFunc("/config", handleConfig)
+	// http.HandleFunc("/config", handleConfig)
 	http.HandleFunc("/js/ws.js", handleJavascript)
 	http.HandleFunc("/js/ui.js", handleJavascript)
 	http.HandleFunc("/redis/flush", handleFlush)
 	http.HandleFunc("/messages/flush", handleFlush)
+	http.HandleFunc("/messages/toggle", handleToggleMessageLogging)
 
 	// fmt.Printf("Starting Web Console on %v\n", config.Server.Web_address)
 	// if err := http.ListenAndServe(config.Server.Web_address, nil); err != nil {
@@ -136,11 +146,27 @@ func handleMessages(res http.ResponseWriter, req *http.Request) {
 	messagesTmpl := MessagessTmpl{Messages: messages}
 	messagesTmpl.Count = len(messages)
 	messagesTmpl.PP = computePagePagination(current, totalMessages, items_per_page_messages)
+	messagesTmpl.Enabled = config.Server.Log_messages
 
 	err := tpl.ExecuteTemplate(res, "messages.gohtml", messagesTmpl)
 	if err != nil {
 		log.Printf("Render Error: \"messages.gohtml\": %v\n", err)
 	}
+}
+
+func handleToggleMessageLogging(res http.ResponseWriter, req *http.Request) {
+	state, err := strconv.ParseBool(req.URL.Query().Get("enabled"))
+	if err != nil {
+		log.Printf("handleToggleMessageLogging.ParseBool() failed: %v\n", err)
+		res.WriteHeader(500)
+		res.Write(nil)
+		return
+	}
+
+	log.Printf("Setting Message Logging to %v\n", state)
+	config.Server.Log_messages = state
+	res.WriteHeader(200)
+	res.Write(nil)
 }
 
 func handleUsers(res http.ResponseWriter, req *http.Request) {
@@ -153,11 +179,8 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 	fmt.Println(totalUserCount)
 	page := req.URL.Query().Get("page")
 	start, current := getPaginationPage(page, items_per_page)
-	fmt.Println("2 ")
 	usersTmpl := getUsers(start, fmt.Sprintf("%d", items_per_page))
-	fmt.Println("3 ")
 	usersTmpl.PP = computePagePagination(current, int(totalUserCount), items_per_page)
-	fmt.Println("4 ")
 	err = tpl.ExecuteTemplate(res, "users.gohtml", usersTmpl)
 	if err != nil {
 		log.Printf("Render Error: \"users.gohtml\": %v\n", err)
@@ -195,6 +218,77 @@ func handleFilters(res http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		fmt.Printf("%+v\n", err)
 	}
+}
+
+func handleConfig(res http.ResponseWriter, req *http.Request) {
+	fmt.Println("Returning Config")
+	tpl.ExecuteTemplate(res, "config.gohtml", nil)
+}
+
+func handleUpdateUser(res http.ResponseWriter, req *http.Request) {
+	id := req.URL.Query().Get("id")
+	b, err := getBody(req)
+	if err != nil {
+		log.Printf("handleUpdateUser error: %v\n", err)
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	err = sendUpdateToScim("http://localhost:8082/scim/v2/Users/"+id, string(b))
+	if err != nil {
+		log.Printf("handleUpdateUser() error: %v\n", err)
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(err.Error()))
+		return
+	}
+
+	res.WriteHeader(200)
+}
+
+func handleDeleteUser(res http.ResponseWriter, req *http.Request) {
+	id := req.URL.Query().Get("id")
+	err := sendDeleteToScim("http://localhost:8082/scim/v2/Users/" + id)
+	if err != nil {
+		log.Printf("handleDeleteUser() error: %v\n", err)
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(err.Error()))
+		return
+	}
+
+	res.WriteHeader(200)
+}
+
+func handleUpdateGroup(res http.ResponseWriter, req *http.Request) {
+	id := req.URL.Query().Get("id")
+	b, err := getBody(req)
+	if err != nil {
+		log.Printf("handleUpdateGroup error: %v\n", err)
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	err = sendUpdateToScim("http://localhost:8082/scim/v2/Groups/"+id, string(b))
+	if err != nil {
+		log.Printf("handleUpdateGroup() error: %v\n", err)
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(err.Error()))
+		return
+	}
+
+	res.WriteHeader(200)
+}
+
+func handleDeleteGroup(res http.ResponseWriter, req *http.Request) {
+	id := req.URL.Query().Get("id")
+	err := sendDeleteToScim("http://localhost:8082/scim/v2/Groups/" + id)
+	if err != nil {
+		log.Printf("handleDeleteGroup() error: %v\n", err)
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(err.Error()))
+		return
+	}
+
+	res.WriteHeader(200)
 }
 
 func handleFlush(res http.ResponseWriter, req *http.Request) {
@@ -247,11 +341,6 @@ func handleWebSocketUpgrade(res http.ResponseWriter, req *http.Request) {
 	// listen indefinitely for new messages coming
 	// through on our WebSocket connection
 	go wsReader()
-}
-
-func handleConfig(res http.ResponseWriter, req *http.Request) {
-	fmt.Println("Returning Config")
-	tpl.ExecuteTemplate(res, "config.gohtml", nil)
 }
 
 func handleJavascript(res http.ResponseWriter, req *http.Request) {
@@ -332,8 +421,9 @@ func getUsers(start, count string) UsersTmpl {
 	ut.Count = lr.TotalResults
 	for _, v := range lr.Resources {
 		userName := v.(map[string]interface{})["userName"]
+		id := v.(map[string]interface{})["id"]
 		user, _ := json.MarshalIndent(v, "", "  ")
-		ut.Users = append(ut.Users, UserTmpl{Username: userName.(string), Json: string(user)})
+		ut.Users = append(ut.Users, UserTmpl{Username: userName.(string), Id: id.(string), Json: string(user)})
 	}
 
 	return ut
@@ -350,8 +440,9 @@ func getGroups(start, count string) GroupsTmpl {
 	gt.Count = lr.TotalResults
 	for _, v := range lr.Resources {
 		displayName := v.(map[string]interface{})["displayName"]
+		id := v.(map[string]interface{})["id"]
 		group, _ := json.MarshalIndent(v, "", "  ")
-		gt.Groups = append(gt.Groups, GroupTmpl{GroupName: displayName.(string), Json: string(group)})
+		gt.Groups = append(gt.Groups, GroupTmpl{GroupName: displayName.(string), Id: id.(string), Json: string(group)})
 	}
 	return gt
 }
@@ -373,6 +464,42 @@ func getListResponseResource(url string) (*v2.ListResponse, error) {
 	} else {
 		return nil, fmt.Errorf("%v", res.Status)
 	}
+}
+
+func sendUpdateToScim(url, msg string) error {
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer([]byte(msg)))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		log.Printf("sendUpdateToScim() error: %v\n", string(body))
+		return fmt.Errorf("%q", string(body))
+	}
+
+	return nil
+}
+
+func sendDeleteToScim(url string) error {
+	req, err := http.NewRequest("DELETE", url, nil)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		log.Printf("sendDeleteToScim() error: %v\n", string(body))
+		return fmt.Errorf("%q", string(body))
+	}
+
+	return nil
 }
 
 func computePagePagination(currentPage, itemCount, itemsPerPage int) PagePagination {
@@ -429,4 +556,15 @@ func getPaginationPage(page string, itemsPerPAge int) (string, int) {
 	}
 
 	return start, current
+}
+
+func getBody(req *http.Request) ([]byte, error) {
+	b, err := io.ReadAll(req.Body)
+	if err != nil {
+		log.Printf("Error reading Json Data: %v\n", err)
+		return nil, err
+	}
+
+	defer req.Body.Close()
+	return b, nil
 }

@@ -9,6 +9,6 @@ server:
     debug_headers: false
     debug_body: false
     debug_query: false
-    log_messages: true
+    log_messages: false
 scim:
     enable_groups: true
