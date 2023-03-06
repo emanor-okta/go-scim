@@ -66,16 +66,16 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 		// POST
 		b, err := getBody(req)
 		if err != nil {
-			res.WriteHeader(http.StatusOK)
-			res.Write(nil)
+			res.WriteHeader(http.StatusBadRequest)
+			res.Write([]byte(err.Error()))
 			return
 		}
 
 		var m map[string]interface{}
 		if err := json.Unmarshal(b, &m); err != nil {
 			log.Printf("Error decoding Json Data: %v\n", err)
-			res.WriteHeader(http.StatusOK)
-			res.Write(nil)
+			res.WriteHeader(http.StatusBadRequest)
+			res.Write([]byte(err.Error()))
 			return
 		}
 
@@ -163,8 +163,8 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 			var m map[string]interface{}
 			if err := json.Unmarshal(b, &m); err != nil {
 				log.Printf("Error decoding Json Data: %v\n", err)
-				res.WriteHeader(http.StatusOK)
-				res.Write(nil)
+				res.WriteHeader(http.StatusBadRequest)
+				res.Write([]byte(err.Error()))
 				return
 			}
 

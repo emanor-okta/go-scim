@@ -105,6 +105,8 @@ func StartWebServer(c *utils.Configuration) {
 	// http.HandleFunc("/config", handleConfig)
 	http.HandleFunc("/js/ws.js", handleJavascript)
 	http.HandleFunc("/js/ui.js", handleJavascript)
+	http.HandleFunc("/raw/user.json", handleRawJSON)
+	http.HandleFunc("/raw/group.json", handleRawJSON)
 	http.HandleFunc("/redis/flush", handleFlush)
 	http.HandleFunc("/messages/flush", handleFlush)
 	http.HandleFunc("/messages/toggle", handleToggleMessageLogging)
@@ -226,23 +228,7 @@ func handleConfig(res http.ResponseWriter, req *http.Request) {
 }
 
 func handleUpdateUser(res http.ResponseWriter, req *http.Request) {
-	id := req.URL.Query().Get("id")
-	b, err := getBody(req)
-	if err != nil {
-		log.Printf("handleUpdateUser error: %v\n", err)
-		res.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	err = sendUpdateToScim("http://localhost:8082/scim/v2/Users/"+id, string(b))
-	if err != nil {
-		log.Printf("handleUpdateUser() error: %v\n", err)
-		res.WriteHeader(http.StatusInternalServerError)
-		res.Write([]byte(err.Error()))
-		return
-	}
-
-	res.WriteHeader(200)
+	handleUpdate(res, req, "http://localhost:8082/scim/v2/Users")
 }
 
 func handleDeleteUser(res http.ResponseWriter, req *http.Request) {
@@ -259,18 +245,30 @@ func handleDeleteUser(res http.ResponseWriter, req *http.Request) {
 }
 
 func handleUpdateGroup(res http.ResponseWriter, req *http.Request) {
+	handleUpdate(res, req, "http://localhost:8082/scim/v2/Groups")
+}
+
+func handleUpdate(res http.ResponseWriter, req *http.Request, url string) {
 	id := req.URL.Query().Get("id")
 	b, err := getBody(req)
 	if err != nil {
 		log.Printf("handleUpdateGroup error: %v\n", err)
-		res.WriteHeader(http.StatusInternalServerError)
+		res.WriteHeader(http.StatusBadRequest)
+		res.Write([]byte(err.Error()))
 		return
 	}
 
-	err = sendUpdateToScim("http://localhost:8082/scim/v2/Groups/"+id, string(b))
+	// url := "http://localhost:8082/scim/v2/Groups"
+	method := "POST"
+	if id != "" {
+		url = fmt.Sprintf("%s/%s", url, id)
+		method = "PUT"
+	}
+
+	err = sendUpdateToScim(url, method, string(b))
 	if err != nil {
 		log.Printf("handleUpdateGroup() error: %v\n", err)
-		res.WriteHeader(http.StatusInternalServerError)
+		res.WriteHeader(http.StatusBadRequest)
 		res.Write([]byte(err.Error()))
 		return
 	}
@@ -355,6 +353,20 @@ func handleJavascript(res http.ResponseWriter, req *http.Request) {
 
 	http.ServeFile(res, req, fp)
 	tpl.ExecuteTemplate(res, "config.gohtml", nil)
+}
+
+func handleRawJSON(res http.ResponseWriter, req *http.Request) {
+	//fmt.Println(req.URL.Path)
+	res.Header().Set("Content-Type", "application/json")
+	var fp string
+	if req.URL.Path == "/raw/user.json" {
+		fp = path.Join("server", "web", "raw", "user.json")
+	} else {
+		fp = path.Join("server", "web", "raw", "group.json")
+	}
+
+	http.ServeFile(res, req, fp)
+	//tpl.ExecuteTemplate(res, "config.gohtml", nil)
 }
 
 func handleToggleFilter(res http.ResponseWriter, req *http.Request) {
@@ -466,8 +478,8 @@ func getListResponseResource(url string) (*v2.ListResponse, error) {
 	}
 }
 
-func sendUpdateToScim(url, msg string) error {
-	req, err := http.NewRequest("PUT", url, bytes.NewBuffer([]byte(msg)))
+func sendUpdateToScim(url, method, msg string) error {
+	req, err := http.NewRequest(method, url, bytes.NewBuffer([]byte(msg)))
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	resp, err := client.Do(req)

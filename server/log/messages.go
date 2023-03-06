@@ -32,8 +32,8 @@ func Init() {
 }
 
 func (m Message) FormatDate() string {
-	// return m.TimeStamp.Format("Mon Jan 2 15:04:05.999")
-	return m.TimeStamp.Format("01/02/2006 15:04:05.999")
+	return m.TimeStamp.Format("Jan 2 15:04:05.000")
+	//return m.TimeStamp.Format("01/02/2006 15:04:05.999")
 }
 
 func (m Message) FormatMessage() string {

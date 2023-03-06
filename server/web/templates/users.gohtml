@@ -3,7 +3,19 @@
 <script src="js/ui.js" type="text/javascript"></script>
 
 <div id="content" class="ui text container">
-  <h2>Users</h2>
+
+  <div class="row">
+    <div class="col-8">
+      <h2>Users</h2>
+    </div>
+    <div class="col-4"-->
+      <!-- Button trigger new user modal -->
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#newUserModal" style="float: right;" onclick="populateNewUser();return false">
+        Create User
+      </button>
+    </div>
+  </div>
+  
 
   {{$active := .PP.CurrentPage}}
   {{$pageCount := .PP.PageCount}}
@@ -86,4 +98,27 @@
 
 
 </div>
+
+
+<!-- New User Modal -->
+<div class="modal fade" id="newUserModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="newUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="newUserModalLabel">Create New User</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <textarea class="form-control" id="newUserArea" name="newUserArea" rows="30">{"loadning":"template user..."}</textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-outline-primary" onclick="createNewUser();return false">Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
 {{template "footer"}}

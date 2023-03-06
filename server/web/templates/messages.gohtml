@@ -1,7 +1,8 @@
 {{template "header" .}}
 
 
-<div id="content" class="ui text container">
+{{/* <div id="content" class="ui text container"> */}}
+<div id="content" class="ui text container-fluid">
   
   <div class="container">
   <div class="row">
@@ -49,7 +50,15 @@
         <div class="accordion-item">
           <h2 class="accordion-header" id="flush-heading-{{$i}}">
             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#flush-collapse-{{$i}}" aria-expanded="false" aria-controls="flush-collapse-{{$i}}">
-              {{$message.FormatDate}}:&nbsp;&nbsp;<strong>  <span style="color:gray">{{$message.Method}}</span> <span style="color:black">&nbsp;&nbsp;{{$message.Response}}&nbsp;{{$message.ResponseStatusString}}</span> <span style="color:blue">&nbsp;&nbsp;{{$message.Url}}</span>&nbsp;&nbsp;&nbsp;&nbsp;</strong>{{$message.FormatElapsedTime}}
+              {{/* {{$message.FormatDate}}:&nbsp;&nbsp;<strong>  <span style="color:gray">{{$message.Method}}</span> <span style="color:black">&nbsp;&nbsp;{{$message.Response}}&nbsp;{{$message.ResponseStatusString}}</span> <span style="color:blue">&nbsp;&nbsp;{{$message.Url}}</span>&nbsp;&nbsp;&nbsp;&nbsp;</strong>{{$message.FormatElapsedTime}} */}}
+              <div class="container-fluid">
+                <div class="row">
+                  <div class="col-2">{{$message.FormatDate}}</div>
+                  <div class="col-2"><span style="color:gray">{{$message.Method}}</span> <span style="color:black">{{$message.Response}} {{$message.ResponseStatusString}}</span></div>
+                  <div class="col-7"><span style="color:blue">{{$message.Url}}</span></div>
+                  <div class="col-1">{{$message.FormatElapsedTime}}</div>
+                </div>
+              </div>
             </button>
           </h2>
           <div id="flush-collapse-{{$i}}" class="accordion-collapse collapse" aria-labelledby="flush-heading-{{$i}}" data-bs-parent="#accordionFlushExample">

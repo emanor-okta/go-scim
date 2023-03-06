@@ -1,0 +1,12 @@
+{
+    "displayName": "SCIM Group 1",
+    "members": [
+      {
+        "display": "some.user@emanor.internal",
+        "value": "the-users-uuid-from-scim"
+      }
+    ],
+    "schemas": [
+      "urn:ietf:params:scim:schemas:core:2.0:Group"
+    ]
+  }

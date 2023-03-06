@@ -38,7 +38,12 @@ function logMessagesToggled() {
 function updateUser(id) {
   var userId = document.getElementById('id-'+id).value;
   var msg = document.getElementById('messageArea-'+id).value;
-  sendPost("http://localhost:8082/users/update?id=" + userId, msg);
+  sendPost("http://localhost:8082/users/update?id=" + userId, msg, success);
+}
+
+function createNewUser() {
+  const user = document.getElementById("newUserArea").value;
+  sendPost("http://localhost:8082/users/update", user, success);
 }
 
 function deleteUser(id) {
@@ -60,7 +65,12 @@ function deleteUser(id) {
 function updateGroup(id) {
   var groupId = document.getElementById('id-'+id).value;
   var msg = document.getElementById('messageArea-'+id).value;
-  sendPost("http://localhost:8082/groups/update?id=" + groupId, msg);
+  sendPost("http://localhost:8082/groups/update?id=" + groupId, msg, success);
+}
+
+function createNewGroup() {
+  const group = document.getElementById("newGroupArea").value;
+  sendPost("http://localhost:8082/groups/update", group, success);
 }
 
 function deleteGroup(id) {
@@ -76,6 +86,32 @@ function deleteGroup(id) {
   }).catch(err => {
     console.log(err);
     alert('Failed to delete group ' + err);
+  });
+}
+
+function populateNewUser() {
+  fetchTemplateData('http://localhost:8082/raw/user.json', document.getElementById("newUserArea"));
+}
+
+function populateNewGroup() {
+  fetchTemplateData('http://localhost:8082/raw/group.json', document.getElementById("newGroupArea"));
+}
+
+function fetchTemplateData(url, element) {
+  fetch(url)
+  .then(response => {
+    if (!response.ok) {
+      alert('Failed to load content from: ' + url + '\nStatus: ' + response.statusText);
+      return;
+    }
+    response.json()
+    .then(data => {
+      console.log(JSON.stringify(data, null, "  "));
+      element.textContent = JSON.stringify(data, null, "  ");
+    });
+  }).catch(err => {
+    console.log(err);
+    alert('Failed to load content from: ' + url + '\nError: ' + err);
   });
 }
 
@@ -104,7 +140,7 @@ function flush(type) {
   });
 }
 
-function sendPost(url, msg) {
+function sendPost(url, msg, success) {
   const options = {
     method: "POST",
     body: msg,
@@ -114,10 +150,19 @@ function sendPost(url, msg) {
   .then(response => {
     console.log(response);
     if (!response.ok) {
-      alert('Failed posting to: ' + url +', status: ' + response.statusText);
+      response.text()
+      .then(d => {
+        alert('Failed posting to: ' + url +'\nStatus: ' + response.statusText + '\nError: ' + d);
+      });
+      return;
     }
+    success();
   }).catch(err => {
     console.log(err);
     alert('Failed posting to: ' + url +', error: ' + err);
   });
+}
+
+function success() {
+  window.location.reload();
 }

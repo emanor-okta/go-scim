@@ -75,16 +75,17 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 		// POST
 		b, err := getBody(req)
 		if err != nil {
-			res.WriteHeader(http.StatusOK)
-			res.Write(nil)
+			log.Printf("Error getting POST body: %v\n", err)
+			res.WriteHeader(http.StatusBadRequest)
+			res.Write([]byte(err.Error()))
 			return
 		}
 
 		var m map[string]interface{}
 		if err := json.Unmarshal(b, &m); err != nil {
 			log.Printf("Error decoding Json Data: %v\n", err)
-			res.WriteHeader(http.StatusOK)
-			res.Write(nil)
+			res.WriteHeader(http.StatusBadRequest)
+			res.Write([]byte(err.Error()))
 			return
 		}
 
@@ -164,8 +165,8 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 	} else {
 		b, err := getBody(req)
 		if err != nil {
-			res.WriteHeader(http.StatusInternalServerError)
-			res.Write(nil)
+			res.WriteHeader(http.StatusBadRequest)
+			res.Write([]byte(err.Error()))
 			return
 		}
 
@@ -174,7 +175,13 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 			b = reqFilter.UserIdPutRequest(b, fmt.Sprintf("PUT %s  -  Request", path))
 
 			var m map[string]interface{}
-			json.Unmarshal(b, &m)
+			err := json.Unmarshal(b, &m)
+			if err != nil {
+				res.WriteHeader(http.StatusBadRequest)
+				res.Write([]byte(err.Error()))
+				return
+			}
+
 			ids, groups := buildGroupsMembersList(m["groups"].([]interface{}))
 			m["groups"] = []interface{}{}
 			u, _ := json.Marshal(m)
