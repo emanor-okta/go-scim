@@ -10,5 +10,7 @@ server:
     debug_body: false
     debug_query: false
     log_messages: false
+    proxy_messages: false
+    proxy_address: ":8084"
 scim:
     enable_groups: true

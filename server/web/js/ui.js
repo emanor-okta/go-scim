@@ -20,6 +20,12 @@ function messageTypeToggled(id) {
 
 function logMessagesToggled() {
   var checkBox = document.getElementById('LogMessages');
+  // if (checkBox.checked && document.getElementById('ProxyLogMessages').checked) {
+  //   alert('Failed to enable message logging, Proxy logging already enabled');
+  //   checkBox.checked = false;
+  //   return;
+  // }
+
 
   fetch('http://localhost:8082/messages/toggle?enabled=' + checkBox.checked)
     .then(response => {
@@ -33,6 +39,45 @@ function logMessagesToggled() {
       alert('Failed to change message logging to ' + checkBox.checked + ', error: ' + err);
       checkBox.checked = !checkBox.checked;
     });
+}
+
+function logProxyMessagesToggled() {
+  var checkBox = document.getElementById('ProxyLogMessages');
+  // if (checkBox.checked && document.getElementById('LogMessages').checked) {
+  //   alert('Failed to enable Proxy logging, Message logging already enabled');
+  //   checkBox.checked = false;
+  //   return;
+  // }
+
+  var port = document.getElementById('Port');
+  var origin = document.getElementById('Origin');
+  if (checkBox.checked && (port.value === '' || origin.value === '')) {
+    alert('proxy_port and origin_url can\'t be blank');
+    checkBox.checked = false;
+    return;
+  }
+
+  fetch('http://localhost:8082/proxy/toggle?enabled='+checkBox.checked+'&url='+origin.value+'&port='+port.value)
+  .then(response => {
+    console.log(response);
+    if (!response.ok) {
+      response.json()
+      .then(data => {
+        alert('Failed to change proxy logging to ' + checkBox.checked + '\nError: ' + data["error"]);
+      });
+      checkBox.checked = !checkBox.checked;
+    } else if (checkBox.checked) {
+      port.disabled = true;
+      origin.disabled = true;
+    } else {
+      port.disabled = false;
+      origin.disabled = false;
+    }
+  }).catch(err => {
+    console.log(err);
+    alert('Failed to change proxy logging to ' + checkBox.checked + ', error: ' + err);
+    checkBox.checked = !checkBox.checked;
+  });
 }
 
 function updateUser(id) {
@@ -166,3 +211,58 @@ function sendPost(url, msg, success) {
 function success() {
   window.location.reload();
 }
+
+var refreshInterval = 0;
+function refreshMessages(event) {
+  console.log(event);
+  if (this.value == "Auto Refresh Off") {
+    console.log('Auto Refresh Off');
+    refreshInterval = 0;
+  } else if (this.value == "5") {
+     console.log('5');
+     refreshInterval = 5000;
+  } else if (this.value == "15") {
+    console.log('15');
+    refreshInterval = 15000;
+  } else if (this.value == "30") {
+    console.log('30');
+    refreshInterval = 30000;
+  } else if (this.value == "60") {
+    console.log('60');
+    refreshInterval = 60000;
+  }
+
+  sessionStorage.setItem('refreshInterval', refreshInterval.toString());
+  if (refreshInterval > 0) {
+    startRefresh();
+  }
+}
+
+function startRefresh() {
+  console.log('start timeout');
+  refreshInterval = parseInt(sessionStorage.getItem('refreshInterval'));
+  var index;
+  if (refreshInterval == 5000) {
+    index = 1;
+  } else if (refreshInterval == 15000) {
+    index = 2;
+  } else if (refreshInterval == 30000) {
+    index = 3;
+  } else if (refreshInterval == 60000) {
+    index = 4;
+  } else {
+    index = 0;
+  }
+
+  document.getElementById('AutoRefresh').selectedIndex = index;
+    
+  setTimeout(() => {
+    console.log('awak-' + refreshInterval);
+    if (refreshInterval > 0) {
+      window.location.reload();
+    } 
+  }, refreshInterval);
+}
+
+// document.getElementById('AutoRefreshProxyMessages').addEventListener("change", refreshMessages);
+// document.getElementById('AutoRefresh').addEventListener("change", refreshMessages);

@@ -15,13 +15,18 @@ type Configuration struct {
 		Db       int
 	}
 	Server struct {
-		Address       string
-		Web_address   string
-		Web_console   bool
-		Debug_headers bool
-		Debug_body    bool
-		Debug_query   bool
-		Log_messages  bool
+		Address        string
+		Web_address    string
+		Web_console    bool
+		Debug_headers  bool
+		Debug_body     bool
+		Debug_query    bool
+		Log_messages   bool
+		Proxy_messages bool
+		Proxy_address  string
+		Proxy_port     int
+		Proxy_origin   string
+		ProxyDisabled  bool
 	}
 	Scim struct {
 		Enable_groups     bool

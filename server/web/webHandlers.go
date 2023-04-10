@@ -75,11 +75,15 @@ type GroupsTmpl struct {
 // }
 
 type MessagessTmpl struct {
-	Messages []messageLogs.Message
-	Count    int
-	PP       PagePagination
-	Error    error
-	Enabled  bool
+	Messages           []messageLogs.Message
+	Count              int
+	PP                 PagePagination
+	Error              error
+	Enabled            bool
+	ProxyEnabled       bool
+	ProxyPort          int
+	ProxyOrigin        string
+	ProxySwitchEnabled bool
 }
 
 var upgrader = websocket.Upgrader{
@@ -93,6 +97,7 @@ func StartWebServer(c *utils.Configuration) {
 	tpl = template.Must(template.ParseGlob("server/web/templates/*"))
 
 	http.HandleFunc("/messages", handleMessages)
+	http.HandleFunc("/proxy", handleProxyMessages)
 	http.HandleFunc("/users", handleUsers)
 	http.HandleFunc("/users/update", handleUpdateUser)
 	http.HandleFunc("/users/delete", handleDeleteUser)
@@ -110,6 +115,7 @@ func StartWebServer(c *utils.Configuration) {
 	http.HandleFunc("/redis/flush", handleFlush)
 	http.HandleFunc("/messages/flush", handleFlush)
 	http.HandleFunc("/messages/toggle", handleToggleMessageLogging)
+	http.HandleFunc("/proxy/toggle", handleToggleProxyLogging)
 
 	// fmt.Printf("Starting Web Console on %v\n", config.Server.Web_address)
 	// if err := http.ListenAndServe(config.Server.Web_address, nil); err != nil {
@@ -141,19 +147,7 @@ func StartWebServer(c *utils.Configuration) {
 
 func handleMessages(res http.ResponseWriter, req *http.Request) {
 	fmt.Println("Returning Messages")
-	page := req.URL.Query().Get("page")
-	start, current := getPaginationPage(page, items_per_page_messages)
-	i, _ := strconv.Atoi(start)
-	messages, totalMessages := messageLogs.GetMessages(i-1, items_per_page_messages)
-	messagesTmpl := MessagessTmpl{Messages: messages}
-	messagesTmpl.Count = len(messages)
-	messagesTmpl.PP = computePagePagination(current, totalMessages, items_per_page_messages)
-	messagesTmpl.Enabled = config.Server.Log_messages
-
-	err := tpl.ExecuteTemplate(res, "messages.gohtml", messagesTmpl)
-	if err != nil {
-		log.Printf("Render Error: \"messages.gohtml\": %v\n", err)
-	}
+	getMessages(res, req, "messages.gohtml")
 }
 
 func handleToggleMessageLogging(res http.ResponseWriter, req *http.Request) {
@@ -258,7 +252,6 @@ func handleUpdate(res http.ResponseWriter, req *http.Request, url string) {
 		return
 	}
 
-	// url := "http://localhost:8082/scim/v2/Groups"
 	method := "POST"
 	if id != "" {
 		url = fmt.Sprintf("%s/%s", url, id)
@@ -512,6 +505,30 @@ func sendDeleteToScim(url string) error {
 	}
 
 	return nil
+}
+
+func getMessages(res http.ResponseWriter, req *http.Request, template string) {
+	page := req.URL.Query().Get("page")
+	start, current := getPaginationPage(page, items_per_page_messages)
+	i, _ := strconv.Atoi(start)
+	messages, totalMessages := messageLogs.GetMessages(i-1, items_per_page_messages, template)
+	messagesTmpl := MessagessTmpl{Messages: messages}
+	messagesTmpl.Count = len(messages)
+	messagesTmpl.PP = computePagePagination(current, totalMessages, items_per_page_messages)
+	messagesTmpl.Enabled = config.Server.Log_messages
+	messagesTmpl.ProxyEnabled = config.Server.Proxy_messages
+	messagesTmpl.ProxyPort = config.Server.Proxy_port
+	messagesTmpl.ProxyOrigin = config.Server.Proxy_origin
+	if config.Server.Proxy_address != "" && config.Server.Proxy_port > 0 {
+		messagesTmpl.ProxySwitchEnabled = true
+	} else {
+		messagesTmpl.ProxySwitchEnabled = false
+	}
+
+	err := tpl.ExecuteTemplate(res, template, messagesTmpl)
+	if err != nil {
+		log.Printf(`Render Error: "%s": %v\n`, template, err)
+	}
 }
 
 func computePagePagination(currentPage, itemCount, itemsPerPage int) PagePagination {

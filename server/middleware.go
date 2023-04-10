@@ -65,7 +65,7 @@ func getBodyMiddleware(h http.HandlerFunc) http.HandlerFunc {
 
 func logMessagesMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if config.Server.Log_messages {
+		if config.Server.Log_messages || config.Server.Proxy_messages {
 			now := time.Now()
 			//Headers
 			var sb strings.Builder

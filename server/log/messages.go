@@ -8,8 +8,12 @@ import (
 	"time"
 )
 
+const proxy_msg = "proxy.gohtml"
+const scim_msg = "messages.gohtml"
+
 var inFlight map[string]Message
 var messages []Message
+var proxyMessages []Message
 
 var rwLock sync.RWMutex
 
@@ -23,11 +27,13 @@ type Message struct {
 	Headers              string
 	RequestBody          string
 	ResponseBody         string
+	ResponseHeaders      string
 }
 
 func Init() {
 	//TODO get message history length - for now grows until a crash?
 	messages = make([]Message, 0)
+	proxyMessages = make([]Message, 0)
 	inFlight = make(map[string]Message)
 }
 
@@ -37,7 +43,11 @@ func (m Message) FormatDate() string {
 }
 
 func (m Message) FormatMessage() string {
-	return fmt.Sprintf("------- Headers -------\n%s\n----- Request Body -----\n%s\n----- Response Body -----\n%s", m.Headers, m.RequestBody, m.ResponseBody)
+	if m.ResponseHeaders != "" {
+		return fmt.Sprintf("------- Request Headers -------\n%s\n----- Request Body -----\n%s\n------- Response Headers -------\n%s\n----- Response Body -----\n%s", m.Headers, m.RequestBody, m.ResponseHeaders, m.ResponseBody)
+	} else {
+		return fmt.Sprintf("------- Request Headers -------\n%s\n----- Request Body -----\n%s\n----- Response Body -----\n%s", m.Headers, m.RequestBody, m.ResponseBody)
+	}
 }
 
 func (m Message) FormatElapsedTime() string {
@@ -54,12 +64,20 @@ func AddRequest(k string, m Message) {
 	rwLock.Unlock()
 }
 
-func AddResponse(k string, respBody string) {
+func AddResponse(k, respBody, msgType string, respHeader *string) {
 	rwLock.Lock()
 	if m, ok := inFlight[k]; ok {
 		m.ResponseBody = respBody
 		m.TimeStampResp = time.Now()
-		messages = append(messages, m)
+		if respHeader != nil {
+			m.ResponseHeaders = *respHeader
+		}
+
+		if scim_msg == msgType {
+			messages = append(messages, m)
+		} else {
+			proxyMessages = append(messages, m)
+		}
 		delete(inFlight, k)
 	}
 	rwLock.Unlock()
@@ -77,14 +95,19 @@ func AddResponseStatus(k string, status int) {
 }
 
 func GetInFlightMessages() map[string]Message {
-
 	return inFlight
 }
 
-func GetMessages(start, count int) ([]Message, int) {
+func GetMessages(start, count int, msgType string) ([]Message, int) {
+	var msgs *[]Message
+	if msgType == proxy_msg {
+		msgs = &proxyMessages
+	} else {
+		msgs = &messages
+	}
 	end := start + count
 	rwLock.RLock()
-	l := len(messages)
+	l := len(*msgs)
 	if l <= start {
 		rwLock.RUnlock()
 		return []Message{}, l
@@ -93,7 +116,7 @@ func GetMessages(start, count int) ([]Message, int) {
 		end = l
 	}
 	messagesCopy := make([]Message, end-start)
-	copy(messagesCopy, messages[start:end])
+	copy(messagesCopy, (*msgs)[start:end])
 	rwLock.RUnlock()
 	return messagesCopy, l
 }

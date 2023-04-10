@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	messageLogs "github.com/emanor-okta/go-scim/server/log"
 )
+
+const scim_msg = "messages.gohtml"
 
 type LoggerResponseWriter struct {
 	RW http.ResponseWriter
@@ -19,17 +22,28 @@ func (lrw LoggerResponseWriter) Header() http.Header {
 }
 
 func (lrw LoggerResponseWriter) Write(b []byte) (int, error) {
-	if config.Server.Log_messages {
+	if config.Server.Log_messages || config.Server.Proxy_messages {
+		//header
+		var header *string
+		if config.Server.Proxy_messages {
+			var sb strings.Builder
+			for k, v := range lrw.RW.Header() {
+				sb.WriteString(fmt.Sprintf("%v : %v\n", k, v))
+			}
+			*header = sb.String()
+		}
+
+		// body
 		if b != nil && len(b) > 1 {
 			buf := bytes.Buffer{}
 			if err := json.Indent(&buf, b, "", "   "); err != nil {
 				fmt.Printf("Error Formatting JSON: %s\n", err)
 			} else {
 				// fmt.Printf("%s\n", buf.String())
-				messageLogs.AddResponse(fmt.Sprintf("%p", lrw.R), buf.String())
+				messageLogs.AddResponse(fmt.Sprintf("%p", lrw.R), buf.String(), scim_msg, header)
 			}
 		} else {
-			messageLogs.AddResponse(fmt.Sprintf("%p", lrw.R), "")
+			messageLogs.AddResponse(fmt.Sprintf("%p", lrw.R), "", scim_msg, header)
 		}
 	}
 
