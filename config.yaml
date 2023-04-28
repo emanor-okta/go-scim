@@ -1,5 +1,6 @@
 redis:
-    address: localhost:6379
+    # address: localhost:6379
+    address: redis-scim:6379
     password: ""
     db: 0
 server:

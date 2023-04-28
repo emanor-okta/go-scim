@@ -56,6 +56,7 @@ func (m Message) FormatElapsedTime() string {
 
 func AddRequest(k string, m Message) {
 	// if the request comes from web interface ignore
+	// fmt.Printf("Key: %s Adding: %+v\n", k, m)
 	if strings.Contains(m.Headers, "Go-http-client/1.1") {
 		return
 	}
@@ -66,7 +67,9 @@ func AddRequest(k string, m Message) {
 
 func AddResponse(k, respBody, msgType string, respHeader *string) {
 	rwLock.Lock()
+	// fmt.Printf("Add Response key: %s, type: %s\n", k, msgType)
 	if m, ok := inFlight[k]; ok {
+		// fmt.Printf("found: %v\n", ok)
 		m.ResponseBody = respBody
 		m.TimeStampResp = time.Now()
 		if respHeader != nil {
@@ -76,7 +79,7 @@ func AddResponse(k, respBody, msgType string, respHeader *string) {
 		if scim_msg == msgType {
 			messages = append(messages, m)
 		} else {
-			proxyMessages = append(messages, m)
+			proxyMessages = append(proxyMessages, m)
 		}
 		delete(inFlight, k)
 	}
@@ -124,6 +127,7 @@ func GetMessages(start, count int, msgType string) ([]Message, int) {
 func FlushMessages() {
 	rwLock.Lock()
 	messages = make([]Message, 0)
+	proxyMessages = make([]Message, 0)
 	inFlight = make(map[string]Message)
 	rwLock.Unlock()
 }

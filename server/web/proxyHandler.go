@@ -52,35 +52,28 @@ func startProxy(address string, originUrl *url.URL) {
 
 	rewrite := func(pr *httputil.ProxyRequest) {
 		pr.SetURL(originUrl)
-		fmt.Printf("OUT:\n%+v\n", *pr.Out)
 	}
-
 	proxy = &httputil.ReverseProxy{Rewrite: rewrite}
-
 	proxy.ModifyResponse = modifyResponseImpl
-
 	proxy.Transport = http.DefaultTransport
 	proxy.Transport.(*http.Transport).TLSClientConfig = &tls.Config{
 		// Set InsecureSkipVerify to skip the default validation we are
 		// replacing. This will not disable VerifyConnection.
 		InsecureSkipVerify: true,
 		VerifyConnection: func(cs tls.ConnectionState) error {
-			fmt.Printf("Verify:\n%+v\n", cs)
 			opts := x509.VerifyOptions{
 				DNSName:       cs.ServerName,
 				Intermediates: x509.NewCertPool(),
 			}
 			for _, cert := range cs.PeerCertificates[1:] {
-				// fmt.Printf("cert:\n%+v\n", cert)
 				opts.Intermediates.AddCert(cert)
 			}
 			_, err := cs.PeerCertificates[0].Verify(opts)
-			fmt.Printf("err:\n%+v\n", err)
 			return err
 		},
-		ServerName: "oie.erikdevelopernot.com",
+		// SNI Support
+		ServerName: originUrl.Host,
 	}
-	fmt.Printf("Transport: %+v\n", proxy.Transport)
 
 	go func() {
 		log.Printf("Starting Proxy on: %s, origin set to: %s\n", address, originUrl.String())
@@ -104,9 +97,8 @@ func modifyResponseImpl(res *http.Response) error {
 	}
 
 	header := sb.String()
-	fmt.Printf("header:\n%s\n", header)
+	// fmt.Printf("header:\n%s\n", header)
 	// body
-	// if res.ContentLength > 0 { // multi-part/streaming types won't report content-length in header - test with removing
 	b, err := io.ReadAll(res.Body)
 	res.Body.Close()
 	res.Body = ioutil.NopCloser(bytes.NewBuffer(b))
@@ -114,8 +106,8 @@ func modifyResponseImpl(res *http.Response) error {
 		fmt.Printf("Error reading Proxy Response Data: %v\n", err)
 		return nil
 	}
-	if b != nil && len(b) > 1 {
-		fmt.Printf("Body:\n%s\n", string(b))
+	if len(b) > 1 {
+		// fmt.Printf("Body:\n%s\n", string(b))
 		buf := bytes.Buffer{}
 		if err := json.Indent(&buf, b, "", "   "); err != nil {
 			messageLogs.AddResponse(id, string(b), proxy_msg, &header)
@@ -125,9 +117,6 @@ func modifyResponseImpl(res *http.Response) error {
 	} else {
 		messageLogs.AddResponse(id, "", proxy_msg, &header)
 	}
-	// } else {
-	// 	messageLogs.AddResponse(res.Request.Header.Get(http_header_scim_id), "", &header)
-	// }
 
 	return nil
 }
@@ -157,20 +146,17 @@ func handleProxy(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		if b != nil && len(b) > 1 {
+		if len(b) > 1 {
 			buf := bytes.Buffer{}
 			if err := json.Indent(&buf, b, "", "   "); err != nil {
 				log.Printf("handleProxy() - Error Formatting JSON: %s\n", err)
+				m.RequestBody = string(b)
 			} else {
 				m.RequestBody = buf.String()
 			}
 		}
 	}
 	req.Header.Add(http_header_scim_id, fmt.Sprintf("%p", req))
-	// fmt.Printf("HEADER_1: %s\n", req.Header.Get("host"))
-	// req.Header.Set("host", "okta.oktamanor.com")
-	// fmt.Printf("HEADER_2: %s\n", req.Header.Get("host"))
-	fmt.Printf("%+v\n", req.Header)
 	messageLogs.AddRequest(fmt.Sprintf("%p", req), m)
 
 	// send to origin

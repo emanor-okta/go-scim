@@ -512,6 +512,7 @@ func getMessages(res http.ResponseWriter, req *http.Request, template string) {
 	start, current := getPaginationPage(page, items_per_page_messages)
 	i, _ := strconv.Atoi(start)
 	messages, totalMessages := messageLogs.GetMessages(i-1, items_per_page_messages, template)
+	// fmt.Printf("totalMessage: %v, messages: \n%+v\n", totalMessages, messages)
 	messagesTmpl := MessagessTmpl{Messages: messages}
 	messagesTmpl.Count = len(messages)
 	messagesTmpl.PP = computePagePagination(current, totalMessages, items_per_page_messages)

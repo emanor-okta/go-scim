@@ -55,7 +55,8 @@ var luaScripts LuaScriptSHA
 
 func InitializeRedis(config *Configuration) error {
 	rdb = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		// Addr:     "localhost:6379",
+		Addr:     config.Redis.Address,
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
