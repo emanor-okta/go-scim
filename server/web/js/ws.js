@@ -2,7 +2,8 @@ var socket;
 const messages = [];
 
 function intiializeWS() {
-    socket = new WebSocket("ws://localhost:8082/filters/ws");
+    // socket = new WebSocket("ws://localhost:8082/filters/ws");
+    socket = new WebSocket("ws://" + location.host + "/filters/ws");
     console.log("Attempting Connection...");
 
     socket.onopen = () => {
@@ -60,9 +61,17 @@ function submitMessage() {
     document.getElementById('submitMsg').disabled = true;
     var uuid = document.getElementById('uuid').value;
     var msg = document.getElementById('messageArea').value;
-    var obj = JSON.parse(msg);
-    obj["uuid"] = uuid;
-    var str = JSON.stringify(obj);
+    var str;
+    try {
+        var obj = JSON.parse(msg);
+        obj["uuid"] = uuid;
+        str = JSON.stringify(obj);
+    } catch (error) {
+        console.log('Error with Json: ' + error);
+        alert('Error with Json: ' + error);
+        document.getElementById('submitMsg').disabled = false;
+        return;
+    }
     document.getElementById('messageArea').value = "";
     document.getElementById('uuid').value = "";
     document.getElementById('reqType').innerText = "";

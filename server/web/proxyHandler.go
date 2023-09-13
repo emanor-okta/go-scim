@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -18,8 +19,10 @@ import (
 	"time"
 
 	messageLogs "github.com/emanor-okta/go-scim/server/log"
+	// br "github.com/google/brotli/go/cbrotli"
 )
 
+// br "github.com/google/brotli/go/cbrotli"
 const default_proxy_port = 8084
 const http_header_scim_id = "X-Go-Scim-Id"
 const proxy_msg = "proxy.gohtml"
@@ -52,6 +55,8 @@ func startProxy(address string, originUrl *url.URL) {
 
 	rewrite := func(pr *httputil.ProxyRequest) {
 		pr.SetURL(originUrl)
+		// test SNI add host
+		pr.Out.Host = "gw.oktamanor.net"
 	}
 	proxy = &httputil.ReverseProxy{Rewrite: rewrite}
 	proxy.ModifyResponse = modifyResponseImpl
@@ -69,15 +74,18 @@ func startProxy(address string, originUrl *url.URL) {
 				opts.Intermediates.AddCert(cert)
 			}
 			_, err := cs.PeerCertificates[0].Verify(opts)
-			return err
+			//return err
+			log.Printf("Certificate Verifiaction error: %s\n", err)
+			return nil
 		},
 		// SNI Support
-		ServerName: originUrl.Host,
+		ServerName: "gw.oktamanor.net", //  originUrl.Host,
 	}
 
 	go func() {
 		log.Printf("Starting Proxy on: %s, origin set to: %s\n", address, originUrl.String())
 		if err := server.ListenAndServe(); err != nil {
+			// if err := server.ListenAndServeTLS("/Users/erikmanor/Certs/erikdevelopernot.com/origin/cert+chain.pem", "/Users/erikmanor/Certs/erikdevelopernot.com/origin/pkey.pem"); err != nil {
 			log.Printf("Proxy server down: %s\n", err)
 		}
 	}()
@@ -110,6 +118,26 @@ func modifyResponseImpl(res *http.Response) error {
 		// fmt.Printf("Body:\n%s\n", string(b))
 		buf := bytes.Buffer{}
 		if err := json.Indent(&buf, b, "", "   "); err != nil {
+			// check content encoding
+			var compressionReader io.Reader
+			encoding := res.Header.Get("Content-Encoding")
+			fmt.Printf("Encoding: %s\n", encoding)
+			reader := bytes.NewReader(b)
+			if encoding == "gzip" {
+				compressionReader, err = gzip.NewReader(reader)
+				if err != nil {
+					fmt.Printf("Error Reading gzip content: %s\n", err)
+				}
+				// else {
+				// 	b, _ = ioutil.ReadAll(compressionReader)
+				// }
+			} else if encoding == "br" {
+				// compressionReader = br.NewReader(reader)
+			}
+			if compressionReader != nil {
+				b, _ = ioutil.ReadAll(compressionReader)
+				//compressionReader.Close()
+			}
 			messageLogs.AddResponse(id, string(b), proxy_msg, &header)
 		} else {
 			messageLogs.AddResponse(id, buf.String(), proxy_msg, &header)
@@ -156,6 +184,7 @@ func handleProxy(res http.ResponseWriter, req *http.Request) {
 			}
 		}
 	}
+	// add unique message id as http header too match response, use req memory address
 	req.Header.Add(http_header_scim_id, fmt.Sprintf("%p", req))
 	messageLogs.AddRequest(fmt.Sprintf("%p", req), m)
 

@@ -173,10 +173,18 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 		tpl.ExecuteTemplate(res, "users.gohtml", usersTmpl)
 	}
 	fmt.Println(totalUserCount)
+
+	// if GET /scim/v2/users filter is set disable so below call to /scim/v2/users does not send GET mesg to
+	// the browser blocking the page naviagtion to /users
+	filterUsersResponse := config.WebMessageFilter.UserGetResponse
+	config.WebMessageFilter.UserGetResponse = false
 	page := req.URL.Query().Get("page")
 	start, current := getPaginationPage(page, items_per_page)
-	usersTmpl := getUsers(start, fmt.Sprintf("%d", items_per_page))
+	usersTmpl := getUsers(start, fmt.Sprintf("%d", items_per_page), req)
 	usersTmpl.PP = computePagePagination(current, int(totalUserCount), items_per_page)
+
+	// after call to GET /scim/v2/users set filter back to it's original value
+	config.WebMessageFilter.UserGetResponse = filterUsersResponse
 	err = tpl.ExecuteTemplate(res, "users.gohtml", usersTmpl)
 	if err != nil {
 		log.Printf("Render Error: \"users.gohtml\": %v\n", err)
@@ -191,11 +199,18 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 		tpl.ExecuteTemplate(res, "groups.gohtml", groupsTmpl)
 	}
 
+	// if GET /scim/v2/groups filter is set disable so below call to /scim/v2/groups does not send GET mesg to
+	// the browser blocking the page naviagtion to /groups
+	filterGroupsResponse := config.WebMessageFilter.GroupsGetResponse
+	config.WebMessageFilter.GroupsGetResponse = false
+
 	page := req.URL.Query().Get("page")
 	start, current := getPaginationPage(page, items_per_page)
-	groupsTmpl := getGroups(start, fmt.Sprintf("%d", items_per_page))
+	groupsTmpl := getGroups(start, fmt.Sprintf("%d", items_per_page), req)
 	groupsTmpl.PP = computePagePagination(current, int(totalGroupCount), items_per_page)
 
+	// after call to GET /scim/v2/groups set filter back to it's original value
+	config.WebMessageFilter.GroupsGetResponse = filterGroupsResponse
 	err = tpl.ExecuteTemplate(res, "groups.gohtml", groupsTmpl)
 	if err != nil {
 		log.Printf("Render Error: \"groups.gohtml\": %v\n", err)
@@ -216,18 +231,21 @@ func handleFilters(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func handleConfig(res http.ResponseWriter, req *http.Request) {
-	fmt.Println("Returning Config")
-	tpl.ExecuteTemplate(res, "config.gohtml", nil)
-}
+// func handleConfig(res http.ResponseWriter, req *http.Request) {
+// 	fmt.Println("Returning Config")
+// 	tpl.ExecuteTemplate(res, "config.gohtml", nil)
+// }
 
 func handleUpdateUser(res http.ResponseWriter, req *http.Request) {
-	handleUpdate(res, req, "http://localhost:8082/scim/v2/Users")
+	fmt.Printf("%s - %+v\n", req.Host, req.URL)
+	handleUpdate(res, req, "http://"+req.Host+"/scim/v2/Users")
+	// handleUpdate(res, req, "http://localhost:8082/scim/v2/Users")
 }
 
 func handleDeleteUser(res http.ResponseWriter, req *http.Request) {
 	id := req.URL.Query().Get("id")
-	err := sendDeleteToScim("http://localhost:8082/scim/v2/Users/" + id)
+	// err := sendDeleteToScim("http://localhost:8082/scim/v2/Users/" + id)
+	err := sendDeleteToScim("http://" + req.Host + "/scim/v2/Users/" + id)
 	if err != nil {
 		log.Printf("handleDeleteUser() error: %v\n", err)
 		res.WriteHeader(http.StatusInternalServerError)
@@ -239,7 +257,8 @@ func handleDeleteUser(res http.ResponseWriter, req *http.Request) {
 }
 
 func handleUpdateGroup(res http.ResponseWriter, req *http.Request) {
-	handleUpdate(res, req, "http://localhost:8082/scim/v2/Groups")
+	// handleUpdate(res, req, "http://localhost:8082/scim/v2/Groups")
+	handleUpdate(res, req, "http://"+req.Host+"/scim/v2/Groups")
 }
 
 func handleUpdate(res http.ResponseWriter, req *http.Request, url string) {
@@ -271,7 +290,8 @@ func handleUpdate(res http.ResponseWriter, req *http.Request, url string) {
 
 func handleDeleteGroup(res http.ResponseWriter, req *http.Request) {
 	id := req.URL.Query().Get("id")
-	err := sendDeleteToScim("http://localhost:8082/scim/v2/Groups/" + id)
+	// err := sendDeleteToScim("http://localhost:8082/scim/v2/Groups/" + id)
+	err := sendDeleteToScim("http://" + req.Host + "/scim/v2/Groups/" + id)
 	if err != nil {
 		log.Printf("handleDeleteGroup() error: %v\n", err)
 		res.WriteHeader(http.StatusInternalServerError)
@@ -415,10 +435,11 @@ func wsReader() {
 	}
 }
 
-func getUsers(start, count string) UsersTmpl {
+func getUsers(start, count string, req *http.Request) UsersTmpl {
 	ut := UsersTmpl{}
 
-	lr, err := getListResponseResource(fmt.Sprintf("http://localhost:8082/scim/v2/Users?startIndex=%s&count=%s", start, count))
+	// lr, err := getListResponseResource(fmt.Sprintf("http://localhost:8082/scim/v2/Users?startIndex=%s&count=%s", start, count))
+	lr, err := getListResponseResource(fmt.Sprintf("http://%s/scim/v2/Users?startIndex=%s&count=%s", req.Host, start, count))
 	if err != nil {
 		ut.Error = err
 		return ut
@@ -434,10 +455,11 @@ func getUsers(start, count string) UsersTmpl {
 	return ut
 }
 
-func getGroups(start, count string) GroupsTmpl {
+func getGroups(start, count string, req *http.Request) GroupsTmpl {
 	gt := GroupsTmpl{}
 
-	lr, err := getListResponseResource(fmt.Sprintf("http://localhost:8082/scim/v2/Groups?startIndex=%s&count=%s", start, count))
+	// lr, err := getListResponseResource(fmt.Sprintf("http://localhost:8082/scim/v2/Groups?startIndex=%s&count=%s", start, count))
+	lr, err := getListResponseResource(fmt.Sprintf("http://%s/scim/v2/Groups?startIndex=%s&count=%s", req.Host, start, count))
 	if err != nil {
 		gt.Error = err
 		return gt
@@ -472,7 +494,8 @@ func getListResponseResource(url string) (*v2.ListResponse, error) {
 }
 
 func sendUpdateToScim(url, method, msg string) error {
-	req, err := http.NewRequest(method, url, bytes.NewBuffer([]byte(msg)))
+	fmt.Println(url)
+	req, _ := http.NewRequest(method, url, bytes.NewBuffer([]byte(msg)))
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -491,7 +514,7 @@ func sendUpdateToScim(url, method, msg string) error {
 }
 
 func sendDeleteToScim(url string) error {
-	req, err := http.NewRequest("DELETE", url, nil)
+	req, _ := http.NewRequest("DELETE", url, nil)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {

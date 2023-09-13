@@ -1,10 +1,10 @@
 
-
 function messageTypeToggled(id) {
     var checkBox = document.getElementById(id);
     console.log('xhr request to set ' + id + ' to ' + checkBox.checked);
 
-    fetch('http://localhost:8082/filters/toggle?requestType=' + id + '&enabled=' + checkBox.checked)
+    // fetch('http://localhost:8082/filters/toggle?requestType=' + id + '&enabled=' + checkBox.checked)
+    fetch(location.origin + '/filters/toggle?requestType=' + id + '&enabled=' + checkBox.checked)
     .then(response => {
       console.log(response);
       if (!response.ok) {
@@ -27,7 +27,8 @@ function logMessagesToggled() {
   // }
 
 
-  fetch('http://localhost:8082/messages/toggle?enabled=' + checkBox.checked)
+  // fetch('http://localhost:8082/messages/toggle?enabled=' + checkBox.checked)
+    fetch(location.origin + '/messages/toggle?enabled=' + checkBox.checked)
     .then(response => {
       console.log(response);
       if (!response.ok) {
@@ -57,7 +58,8 @@ function logProxyMessagesToggled() {
     return;
   }
 
-  fetch('http://localhost:8082/proxy/toggle?enabled='+checkBox.checked+'&url='+origin.value+'&port='+port.value)
+  // fetch('http://localhost:8082/proxy/toggle?enabled='+checkBox.checked+'&url='+origin.value+'&port='+port.value)
+  fetch(location.origin + '/proxy/toggle?enabled='+checkBox.checked+'&url='+origin.value+'&port='+port.value)
   .then(response => {
     console.log(response);
     if (!response.ok) {
@@ -83,17 +85,18 @@ function logProxyMessagesToggled() {
 function updateUser(id) {
   var userId = document.getElementById('id-'+id).value;
   var msg = document.getElementById('messageArea-'+id).value;
-  sendPost("http://localhost:8082/users/update?id=" + userId, msg, success);
+  sendPost(location.origin + "/users/update?id=" + userId, msg, success);
+  // sendPost("http://localhost:8082/users/update?id=" + userId, msg, success);
 }
 
 function createNewUser() {
   const user = document.getElementById("newUserArea").value;
-  sendPost("http://localhost:8082/users/update", user, success);
+  sendPost(location.origin + "/users/update", user, success);
 }
 
 function deleteUser(id) {
   var userId = document.getElementById('id-'+id).value;
-  fetch('http://localhost:8082/users/delete?id=' + userId)
+  fetch(location.origin + '/users/delete?id=' + userId)
   .then(response => {
     console.log(response);
     if (!response.ok) {
@@ -110,17 +113,17 @@ function deleteUser(id) {
 function updateGroup(id) {
   var groupId = document.getElementById('id-'+id).value;
   var msg = document.getElementById('messageArea-'+id).value;
-  sendPost("http://localhost:8082/groups/update?id=" + groupId, msg, success);
+  sendPost(location.origin + "/groups/update?id=" + groupId, msg, success);
 }
 
 function createNewGroup() {
   const group = document.getElementById("newGroupArea").value;
-  sendPost("http://localhost:8082/groups/update", group, success);
+  sendPost(location.origin + "/groups/update", group, success);
 }
 
 function deleteGroup(id) {
   var groupId = document.getElementById('id-'+id).value;
-  fetch('http://localhost:8082/groups/delete?id=' + groupId)
+  fetch(location.origin + '/groups/delete?id=' + groupId)
   .then(response => {
     console.log(response);
     if (!response.ok) {
@@ -135,11 +138,11 @@ function deleteGroup(id) {
 }
 
 function populateNewUser() {
-  fetchTemplateData('http://localhost:8082/raw/user.json', document.getElementById("newUserArea"));
+  fetchTemplateData(location.origin + '/raw/user.json', document.getElementById("newUserArea"));
 }
 
 function populateNewGroup() {
-  fetchTemplateData('http://localhost:8082/raw/group.json', document.getElementById("newGroupArea"));
+  fetchTemplateData(location.origin + '/raw/group.json', document.getElementById("newGroupArea"));
 }
 
 function fetchTemplateData(url, element) {
@@ -173,7 +176,7 @@ function flush(type) {
   var currentTime = +new Date();
   console.log(currentTime);
 
-  fetch('http://localhost:8082/' + type + '/flush?epoch=' + currentTime)
+  fetch(location.origin + '/' + type + '/flush?epoch=' + currentTime)
   .then(response => {
     console.log(response);
     if (!response.ok) {

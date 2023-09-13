@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/emanor-okta/go-scim/filters"
 	messageLogs "github.com/emanor-okta/go-scim/server/log"
@@ -55,6 +56,42 @@ func StartServer(c *utils.Configuration) {
 	http.HandleFunc("/scim/v2/Users/", addMiddleware(handleUser, middlewares...))
 	http.HandleFunc("/scim/v2/Groups", addMiddleware(handleGroups, middlewares...))
 	http.HandleFunc("/scim/v2/Groups/", addMiddleware(handleGroup, middlewares...))
+
+	// Mock OAuth Server Handlers
+	//http.HandleFunc("/oauth2/v1/authorize", handleAuthorizeReq)
+	//http.HandleFunc("/oauth2/v1/token", handleTokenReq)
+
+	/*
+	 * Redirect testing. Currently PUT does not follow by the client
+	 */
+	handleRedirect := func(req *http.Request, res http.ResponseWriter) {
+		var status int
+		switch {
+		case req.Method == http.MethodGet:
+			status = http.StatusFound //302
+		case req.Method == http.MethodHead:
+			status = http.StatusFound
+		default:
+			status = http.StatusTemporaryRedirect //307
+		}
+		http.Redirect(res, req, strings.Replace(req.URL.RequestURI(), "/scim/v1", "/scim/v2", 1), status)
+		//return strings.Replace(req.URL.RequestURI(), "/scim/v1", "/scim/v2", 1), status
+	}
+	http.HandleFunc("/scim/v1/Users", func(res http.ResponseWriter, req *http.Request) {
+		handleRedirect(req, res)
+	})
+	http.HandleFunc("/scim/v1/Users/", func(res http.ResponseWriter, req *http.Request) {
+		handleRedirect(req, res)
+	})
+	http.HandleFunc("/scim/v1/Groups", func(res http.ResponseWriter, req *http.Request) {
+		handleRedirect(req, res)
+	})
+	http.HandleFunc("/scim/v1/Groups/", func(res http.ResponseWriter, req *http.Request) {
+		handleRedirect(req, res)
+	})
+	/*
+	 * end redirect testing
+	 */
 
 	/*
 	 * SET custome filter Here
@@ -187,4 +224,31 @@ func handleNotSupported(req *http.Request, res *http.ResponseWriter) {
 	log.Printf("Method: %v, not supported for Path: %v\n", req.Method, req.URL.Path)
 	(*res).WriteHeader(http.StatusMethodNotAllowed)
 	(*res).Write(nil)
+}
+
+/*
+ * Mock OAuth Server
+ */
+func handleAuthorizeReq(res http.ResponseWriter, req *http.Request) {
+	fmt.Printf("Received Request:\n%v\n", req.RequestURI)
+	s := req.URL.Query().Get("state")
+	redir := fmt.Sprintf("https://system-admin.oktapreview.com/admin/app/cpc/emanor_iceresearch_1/oauth/callback?code=123456&state=%s", s)
+	http.Redirect(res, req, redir, http.StatusTemporaryRedirect)
+}
+
+func handleTokenReq(res http.ResponseWriter, req *http.Request) {
+	tRes := struct {
+		Access_token string `json:"access_token"`
+		Token_type   string `json:"token_type"`
+		Expires_in   int    `json:"expires_in"`
+		Scope        string `json:"scope"`
+	}{
+		"enlsndlfnsldnsldnfsldsndngf",
+		"Bearer",
+		3600,
+		"scim",
+	}
+	res.Header().Add("Content-Type", "application/json")
+	b, _ := json.Marshal(tRes)
+	res.Write(b)
 }

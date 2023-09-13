@@ -198,6 +198,9 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 			if _, err = res.Write(b); err != nil {
 				log.Printf("Error replying for PUT /scim/v2/User/%v, err: %v\n\n", uuid, err)
 			}
+
+			//res.Header().Add("Retry-After", "1")
+			//res.WriteHeader(http.StatusTooManyRequests)
 		} else if req.Method == http.MethodPatch {
 			// PATCH
 			var ops v2.PatchOp
