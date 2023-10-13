@@ -52,6 +52,7 @@ function logProxyMessagesToggled() {
 
   var port = document.getElementById('Port');
   var origin = document.getElementById('Origin');
+  var sni = document.getElementById('SNI');
   if (checkBox.checked && (port.value === '' || origin.value === '')) {
     alert('proxy_port and origin_url can\'t be blank');
     checkBox.checked = false;
@@ -59,7 +60,7 @@ function logProxyMessagesToggled() {
   }
 
   // fetch('http://localhost:8082/proxy/toggle?enabled='+checkBox.checked+'&url='+origin.value+'&port='+port.value)
-  fetch(location.origin + '/proxy/toggle?enabled='+checkBox.checked+'&url='+origin.value+'&port='+port.value)
+  fetch(location.origin + '/proxy/toggle?enabled='+checkBox.checked+'&url='+origin.value+'&port='+port.value+'&sni='+sni.value)
   .then(response => {
     console.log(response);
     if (!response.ok) {
@@ -71,9 +72,11 @@ function logProxyMessagesToggled() {
     } else if (checkBox.checked) {
       port.disabled = true;
       origin.disabled = true;
+      sni.disabled = true;
     } else {
       port.disabled = false;
       origin.disabled = false;
+      sni.disabled = false;
     }
   }).catch(err => {
     console.log(err);
@@ -186,6 +189,14 @@ function flush(type) {
     console.log(err);
     alert('Failed to flush ' + type);
   });
+}
+
+function generateProxyHar() {
+  document.getElementById('proxy_har_iframe').src = location.origin + '/har/generate?type=proxy';
+}
+
+function generateMessageHar() {
+  document.getElementById('message_har_iframe').src = location.origin + '/har/generate?type=message';
 }
 
 function sendPost(url, msg, success) {

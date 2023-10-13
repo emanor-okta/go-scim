@@ -68,12 +68,20 @@ func logMessagesMiddleware(h http.HandlerFunc) http.HandlerFunc {
 		if config.Server.Log_messages || config.Server.Proxy_messages {
 			now := time.Now()
 			//Headers
+			hMap := make(map[string][]string)
 			var sb strings.Builder
 			// sb.WriteString("HTTP Headers\n")
 			for k, v := range r.Header {
 				sb.WriteString(fmt.Sprintf("%v : %v\n", k, v))
+				hMap[k] = v
 			}
-			m := messageLogs.Message{TimeStamp: now, Method: r.Method, Url: r.URL.RequestURI(), Headers: sb.String()}
+			m := messageLogs.Message{
+				TimeStamp:     now,
+				Method:        r.Method,
+				Url:           r.URL.RequestURI(),
+				Headers:       sb.String(),
+				ReqHeadersMap: hMap,
+			}
 
 			//Body
 			if r.Method == http.MethodPost || r.Method == http.MethodPatch || r.Method == http.MethodPut {

@@ -1,15 +1,23 @@
 package log
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/chromedp/cdproto/har"
 )
 
 const proxy_msg = "proxy.gohtml"
 const scim_msg = "messages.gohtml"
+
+const request_msg_header_body = "------- Request Headers -------\n%s\n----- Request Body -----\n%s\n"
+const response_msg_header = "------- Response Headers -------\n%s\n"
+const response_msg_body = "----- Response Body -----\n%s"
 
 var inFlight map[string]Message
 var messages []Message
@@ -28,6 +36,9 @@ type Message struct {
 	RequestBody          string
 	ResponseBody         string
 	ResponseHeaders      string
+	// Added for .har file generation, UI still relies on headers as string (space vs processing time)
+	ReqHeadersMap  map[string][]string
+	RespHeadersMap map[string][]string
 }
 
 func Init() {
@@ -44,9 +55,9 @@ func (m Message) FormatDate() string {
 
 func (m Message) FormatMessage() string {
 	if m.ResponseHeaders != "" {
-		return fmt.Sprintf("------- Request Headers -------\n%s\n----- Request Body -----\n%s\n------- Response Headers -------\n%s\n----- Response Body -----\n%s", m.Headers, m.RequestBody, m.ResponseHeaders, m.ResponseBody)
+		return fmt.Sprintf(request_msg_header_body+response_msg_header+response_msg_body, m.Headers, m.RequestBody, m.ResponseHeaders, m.ResponseBody)
 	} else {
-		return fmt.Sprintf("------- Request Headers -------\n%s\n----- Request Body -----\n%s\n----- Response Body -----\n%s", m.Headers, m.RequestBody, m.ResponseBody)
+		return fmt.Sprintf(request_msg_header_body+response_msg_body, m.Headers, m.RequestBody, m.ResponseBody)
 	}
 }
 
@@ -56,16 +67,16 @@ func (m Message) FormatElapsedTime() string {
 
 func AddRequest(k string, m Message) {
 	// if the request comes from web interface ignore
-	// fmt.Printf("Key: %s Adding: %+v\n", k, m)
 	if strings.Contains(m.Headers, "Go-http-client/1.1") {
 		return
 	}
+
 	rwLock.Lock()
 	inFlight[k] = m
 	rwLock.Unlock()
 }
 
-func AddResponse(k, respBody, msgType string, respHeader *string) {
+func AddResponse(k, respBody, msgType string, respHeader *string, httpHeaders map[string][]string) {
 	rwLock.Lock()
 	// fmt.Printf("Add Response key: %s, type: %s\n", k, msgType)
 	if m, ok := inFlight[k]; ok {
@@ -76,6 +87,7 @@ func AddResponse(k, respBody, msgType string, respHeader *string) {
 			m.ResponseHeaders = *respHeader
 		}
 
+		m.RespHeadersMap = httpHeaders
 		if scim_msg == msgType {
 			messages = append(messages, m)
 		} else {
@@ -130,4 +142,26 @@ func FlushMessages() {
 	proxyMessages = make([]Message, 0)
 	inFlight = make(map[string]Message)
 	rwLock.Unlock()
+}
+
+func GetHar(harType string) []byte {
+	var har *har.HAR
+	rwLock.Lock()
+	if harType == "proxy" {
+		har = GenerateHar(proxyMessages)
+	} else {
+		har = GenerateHar(messages)
+	}
+	rwLock.Unlock()
+
+	log.Printf("Generating %s har.\n", harType)
+	// fmt.Printf("\n\n%+v\n\n", har)
+	bytes, err := json.MarshalIndent(har, "", "  ")
+	if err != nil {
+		fmt.Printf(">> Marshal Error: %+v\n", err)
+	} else {
+		// fmt.Println(string(bytes))
+	}
+
+	return bytes
 }

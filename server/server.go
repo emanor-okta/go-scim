@@ -25,7 +25,8 @@ const (
 var debugHeaders bool
 var debugBody bool
 var debugQuery bool
-var logMessages bool
+
+// var logMessages bool
 var reqFilter utils.ReqFilter
 var config *utils.Configuration
 
@@ -34,7 +35,7 @@ func StartServer(c *utils.Configuration) {
 	debugHeaders = config.Server.Debug_headers
 	debugBody = config.Server.Debug_body
 	debugQuery = config.Server.Debug_query
-	logMessages = config.Server.Log_messages
+	//logMessages = config.Server.Log_messages
 	log.Printf("starting server at %v\n", config.Server.Address)
 
 	middlewares := []Middleware{}
@@ -58,8 +59,8 @@ func StartServer(c *utils.Configuration) {
 	http.HandleFunc("/scim/v2/Groups/", addMiddleware(handleGroup, middlewares...))
 
 	// Mock OAuth Server Handlers
-	//http.HandleFunc("/oauth2/v1/authorize", handleAuthorizeReq)
-	//http.HandleFunc("/oauth2/v1/token", handleTokenReq)
+	http.HandleFunc("/mock/oauth2/v1/authorize", handleAuthorizeReq)
+	http.HandleFunc("/mock/oauth2/v1/token", handleTokenReq)
 
 	/*
 	 * Redirect testing. Currently PUT does not follow by the client
@@ -232,21 +233,24 @@ func handleNotSupported(req *http.Request, res *http.ResponseWriter) {
 func handleAuthorizeReq(res http.ResponseWriter, req *http.Request) {
 	fmt.Printf("Received Request:\n%v\n", req.RequestURI)
 	s := req.URL.Query().Get("state")
-	redir := fmt.Sprintf("https://system-admin.oktapreview.com/admin/app/cpc/emanor_iceresearch_1/oauth/callback?code=123456&state=%s", s)
+	r := req.URL.Query().Get("redirect_uri")
+	redir := fmt.Sprintf("%s?code=123456&state=%s", r, s)
 	http.Redirect(res, req, redir, http.StatusTemporaryRedirect)
 }
 
 func handleTokenReq(res http.ResponseWriter, req *http.Request) {
 	tRes := struct {
-		Access_token string `json:"access_token"`
-		Token_type   string `json:"token_type"`
-		Expires_in   int    `json:"expires_in"`
-		Scope        string `json:"scope"`
+		Access_token  string `json:"access_token"`
+		Token_type    string `json:"token_type"`
+		Expires_in    int    `json:"expires_in"`
+		Scope         string `json:"scope"`
+		Refresh_token string `json:"refresh_token"`
 	}{
-		"enlsndlfnsldnsldnfsldsndngf",
+		"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
 		"Bearer",
 		3600,
 		"scim",
+		"mock_refresh_token_value",
 	}
 	res.Header().Add("Content-Type", "application/json")
 	b, _ := json.Marshal(tRes)

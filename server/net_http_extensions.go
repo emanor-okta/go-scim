@@ -24,11 +24,13 @@ func (lrw LoggerResponseWriter) Header() http.Header {
 func (lrw LoggerResponseWriter) Write(b []byte) (int, error) {
 	if config.Server.Log_messages || config.Server.Proxy_messages {
 		//header
+		h := make(map[string][]string)
 		var header string
 		if config.Server.Proxy_messages {
 			var sb strings.Builder
 			for k, v := range lrw.RW.Header() {
 				sb.WriteString(fmt.Sprintf("%v : %v\n", k, v))
+				h[k] = v
 			}
 			header = sb.String()
 		}
@@ -40,10 +42,10 @@ func (lrw LoggerResponseWriter) Write(b []byte) (int, error) {
 				fmt.Printf("Error Formatting JSON: %s\n", err)
 			} else {
 				// fmt.Printf("%s\n", buf.String())
-				messageLogs.AddResponse(fmt.Sprintf("%p", lrw.R), buf.String(), scim_msg, &header)
+				messageLogs.AddResponse(fmt.Sprintf("%p", lrw.R), buf.String(), scim_msg, &header, h)
 			}
 		} else {
-			messageLogs.AddResponse(fmt.Sprintf("%p", lrw.R), "", scim_msg, &header)
+			messageLogs.AddResponse(fmt.Sprintf("%p", lrw.R), "", scim_msg, &header, h)
 		}
 	}
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/gorilla/websocket"
 
@@ -17,6 +18,9 @@ type ManualFilter struct {
 	ReqMap map[string]chan interface{}
 }
 
+/*
+ * ReqFilter Implementations
+ */
 func (f ManualFilter) UserPostRequest(doc []byte, path string) []byte {
 	fmt.Printf("ManualFilter UserPostRequest: %v\n", f.Config.WebMessageFilter.UserPostRequest)
 	if f.Config.WebMessageFilter.UserPostRequest {
@@ -143,6 +147,44 @@ func (f ManualFilter) GroupsIdPatchRequest(ops *v2.PatchOp, path string) {
 	}
 }
 
+/*
+ * ProxyFilter Implementations
+ */
+func GetRequest(h http.Header, b []byte, path string) []byte {
+	return nil
+}
+
+func GetResponse(h http.Header, b []byte, path string) []byte {
+	return nil
+}
+
+func PostRequest(h http.Header, b []byte, path string) []byte {
+	return nil
+}
+
+func PostResponse(h http.Header, b []byte, path string) []byte {
+	return nil
+}
+
+func PutRequest(h http.Header, b []byte, path string) []byte {
+	return nil
+}
+
+func PutResponse(h http.Header, b []byte, path string) []byte {
+	return nil
+}
+
+func OptionsRequest(h http.Header, b []byte, path string) []byte {
+	return nil
+}
+
+func OptionsResponse(h http.Header, b []byte, path string) []byte {
+	return nil
+}
+
+/*
+ * Helpers
+ */
 func (f ManualFilter) sendByteArrayRequest(reqType string, doc []byte, path string) []byte {
 	ch := make(chan interface{}, 2)
 	uuid := utils.GenerateUUID()

@@ -23,7 +23,7 @@ import (
 )
 
 // br "github.com/google/brotli/go/cbrotli"
-const default_proxy_port = 8084
+// const default_proxy_port = 8084
 const http_header_scim_id = "X-Go-Scim-Id"
 const proxy_msg = "proxy.gohtml"
 
@@ -35,7 +35,7 @@ func init() {
 	http.HandleFunc("/", handleProxy)
 }
 
-func startProxy(address string, originUrl *url.URL) {
+func startProxy(address string, originUrl *url.URL, sni string) {
 	// hack to fix ngrok not reusing established connections (a guess)
 	f := func(conn net.Conn, connState http.ConnState) {
 		if connState == http.StateIdle {
@@ -50,13 +50,13 @@ func startProxy(address string, originUrl *url.URL) {
 		Addr:      address,
 		ConnState: f,
 	}
+
 	// http.HandleFunc("/", handleProxy)
 	// proxy = httputil.NewSingleHostReverseProxy(originUrl)
-
 	rewrite := func(pr *httputil.ProxyRequest) {
 		pr.SetURL(originUrl)
 		// test SNI add host
-		pr.Out.Host = "gw.oktamanor.net"
+		pr.Out.Host = sni //"gw.oktamanor.net"
 	}
 	proxy = &httputil.ReverseProxy{Rewrite: rewrite}
 	proxy.ModifyResponse = modifyResponseImpl
@@ -79,11 +79,12 @@ func startProxy(address string, originUrl *url.URL) {
 			return nil
 		},
 		// SNI Support
-		ServerName: "gw.oktamanor.net", //  originUrl.Host,
+		//ServerName:/*"gw.oktamanor.net", //*/ originUrl.Host,
+		ServerName: sni, //"gw.oktamanor.net",
 	}
 
 	go func() {
-		log.Printf("Starting Proxy on: %s, origin set to: %s\n", address, originUrl.String())
+		log.Printf("Starting Proxy on: %s, origin set to: %s, sni set to: %s\n", address, originUrl.String(), sni)
 		if err := server.ListenAndServe(); err != nil {
 			// if err := server.ListenAndServeTLS("/Users/erikmanor/Certs/erikdevelopernot.com/origin/cert+chain.pem", "/Users/erikmanor/Certs/erikdevelopernot.com/origin/pkey.pem"); err != nil {
 			log.Printf("Proxy server down: %s\n", err)
@@ -99,9 +100,11 @@ func modifyResponseImpl(res *http.Response) error {
 
 	// process response from origin
 	//header
+	h := make(map[string][]string)
 	sb := strings.Builder{}
 	for k, v := range res.Header {
 		sb.WriteString(fmt.Sprintf("%v : %v\n", k, v))
+		h[k] = v
 	}
 
 	header := sb.String()
@@ -121,7 +124,6 @@ func modifyResponseImpl(res *http.Response) error {
 			// check content encoding
 			var compressionReader io.Reader
 			encoding := res.Header.Get("Content-Encoding")
-			fmt.Printf("Encoding: %s\n", encoding)
 			reader := bytes.NewReader(b)
 			if encoding == "gzip" {
 				compressionReader, err = gzip.NewReader(reader)
@@ -138,16 +140,18 @@ func modifyResponseImpl(res *http.Response) error {
 				b, _ = ioutil.ReadAll(compressionReader)
 				//compressionReader.Close()
 			}
-			messageLogs.AddResponse(id, string(b), proxy_msg, &header)
+			messageLogs.AddResponse(id, string(b), proxy_msg, &header, h)
 		} else {
-			messageLogs.AddResponse(id, buf.String(), proxy_msg, &header)
+			messageLogs.AddResponse(id, buf.String(), proxy_msg, &header, h)
 		}
 	} else {
-		messageLogs.AddResponse(id, "", proxy_msg, &header)
+		messageLogs.AddResponse(id, "", proxy_msg, &header, h)
 	}
 
 	return nil
 }
+
+var i int = 0
 
 // http handlers
 func handleProxy(res http.ResponseWriter, req *http.Request) {
@@ -159,11 +163,20 @@ func handleProxy(res http.ResponseWriter, req *http.Request) {
 
 	now := time.Now()
 	//Headers
+	h := make(map[string][]string)
 	var sb strings.Builder
 	for k, v := range req.Header {
 		sb.WriteString(fmt.Sprintf("%v : %v\n", k, v))
+		h[k] = v
 	}
-	m := messageLogs.Message{TimeStamp: now, Method: req.Method, Url: req.URL.RequestURI(), Headers: sb.String()}
+
+	m := messageLogs.Message{
+		TimeStamp:     now,
+		Method:        req.Method,
+		Url:           fmt.Sprintf("https://%s%s", req.Host, req.URL.RequestURI()),
+		Headers:       sb.String(),
+		ReqHeadersMap: h,
+	}
 	//Body
 	if req.Method == http.MethodPost || req.Method == http.MethodPatch || req.Method == http.MethodPut {
 		b, err := io.ReadAll(req.Body)
@@ -184,6 +197,34 @@ func handleProxy(res http.ResponseWriter, req *http.Request) {
 			}
 		}
 	}
+
+	// TEST - REMOVE
+	/*
+		fmt.Printf("%+v\n", m)
+		if strings.Contains(req.URL.RequestURI(), "/token") {
+			i = i + 1
+			// if i%2 == 0 {
+			if i > 2 {
+				hj, ok := res.(http.Hijacker)
+				if !ok {
+					http.Error(res, "webserver doesn't support hijacking", http.StatusInternalServerError)
+					return
+				}
+				conn, _, err := hj.Hijack()
+				if err != nil {
+					http.Error(res, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				fmt.Println(">>>> Closing /token Connection")
+				if err := conn.Close(); err != nil {
+					fmt.Printf(">>>> Closing /token Connection ERROR: %s\n", err)
+				}
+				return
+			}
+		}
+	*/
+	// END TEST - REMOVE
+
 	// add unique message id as http header too match response, use req memory address
 	req.Header.Add(http_header_scim_id, fmt.Sprintf("%p", req))
 	messageLogs.AddRequest(fmt.Sprintf("%p", req), m)
@@ -224,11 +265,19 @@ func handleToggleProxyLogging(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
+		sni := req.URL.Query().Get("sni")
+		if sni == "" {
+			log.Printf("handleToggleProxyLogging.url.Parse(sni) failed: %v\n", err)
+			log.Println("Setting SNI to Origin")
+			sni = u.Host
+		}
+
 		address := fmt.Sprintf(":%v", port)
-		startProxy(address, u)
+		startProxy(address, u, sni)
 		config.Server.Proxy_address = address
 		config.Server.Proxy_port = int(port)
 		config.Server.Proxy_origin = u.String()
+		config.Server.Proxy_sni = sni
 	} else {
 		log.Println("Shutting down proxy")
 		err := server.Close()

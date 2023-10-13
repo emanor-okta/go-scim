@@ -3,8 +3,20 @@ const messages = [];
 
 function intiializeWS() {
     // socket = new WebSocket("ws://localhost:8082/filters/ws");
-    socket = new WebSocket("ws://" + location.host + "/filters/ws");
     console.log("Attempting Connection...");
+    if (window.location.protocol.includes("https")) {
+        console.log("Attempting wss..");
+        socket = new WebSocket("wss://" + location.host + "/filters/ws");
+    } else {
+        socket = new WebSocket("ws://" + location.host + "/filters/ws");
+    }
+    /*try {
+        socket = new WebSocket("ws://" + location.host + "/filters/ws");
+    } catch (error) {
+        console.log("WebSocket connect error: " + error);
+        console.log("Attempting wss..");
+        socket = new WebSocket("wss://" + location.host + "/filters/ws");
+    }*/
 
     socket.onopen = () => {
         console.log("Successfully Connected");

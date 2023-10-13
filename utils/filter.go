@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"net/http"
+
 	v2 "github.com/emanor-okta/go-scim/types/v2"
 )
 
@@ -41,4 +43,15 @@ type ReqFilter interface {
 
 	// Filters for /scim/v2/Groups/<ID> {PATCH}
 	GroupsIdPatchRequest(ops *v2.PatchOp, path string)
+}
+
+type ProxyFilter interface {
+	GetRequest(http.Header, []byte, string) []byte
+	GetResponse(http.Header, []byte, string) []byte
+	PostRequest(http.Header, []byte, string) []byte
+	PostResponse(http.Header, []byte, string) []byte
+	PutRequest(http.Header, []byte, string) []byte
+	PutResponse(http.Header, []byte, string) []byte
+	OptionsRequest(http.Header, []byte, string) []byte
+	OptionsResponse(http.Header, []byte, string) []byte
 }

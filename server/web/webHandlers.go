@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -22,8 +23,10 @@ import (
 	"github.com/emanor-okta/go-scim/utils"
 )
 
-const items_per_page = 25
-const items_per_page_messages = 100
+const (
+	items_per_page          = 25
+	items_per_page_messages = 100
+)
 
 var tpl *template.Template
 var config *utils.Configuration
@@ -83,6 +86,7 @@ type MessagessTmpl struct {
 	ProxyEnabled       bool
 	ProxyPort          int
 	ProxyOrigin        string
+	SNI                string
 	ProxySwitchEnabled bool
 }
 
@@ -116,6 +120,7 @@ func StartWebServer(c *utils.Configuration) {
 	http.HandleFunc("/messages/flush", handleFlush)
 	http.HandleFunc("/messages/toggle", handleToggleMessageLogging)
 	http.HandleFunc("/proxy/toggle", handleToggleProxyLogging)
+	http.HandleFunc("/har/generate", handleHarGeneration)
 
 	// fmt.Printf("Starting Web Console on %v\n", config.Server.Web_address)
 	// if err := http.ListenAndServe(config.Server.Web_address, nil); err != nil {
@@ -237,15 +242,12 @@ func handleFilters(res http.ResponseWriter, req *http.Request) {
 // }
 
 func handleUpdateUser(res http.ResponseWriter, req *http.Request) {
-	fmt.Printf("%s - %+v\n", req.Host, req.URL)
-	handleUpdate(res, req, "http://"+req.Host+"/scim/v2/Users")
-	// handleUpdate(res, req, "http://localhost:8082/scim/v2/Users")
+	handleUpdate(res, req, fmt.Sprintf("%s%s/scim/v2/Users", getScheme(req.TLS), req.Host))
 }
 
 func handleDeleteUser(res http.ResponseWriter, req *http.Request) {
 	id := req.URL.Query().Get("id")
-	// err := sendDeleteToScim("http://localhost:8082/scim/v2/Users/" + id)
-	err := sendDeleteToScim("http://" + req.Host + "/scim/v2/Users/" + id)
+	err := sendDeleteToScim(fmt.Sprintf("%s%s/scim/v2/Users/%s", getScheme(req.TLS), req.Host, id))
 	if err != nil {
 		log.Printf("handleDeleteUser() error: %v\n", err)
 		res.WriteHeader(http.StatusInternalServerError)
@@ -257,8 +259,7 @@ func handleDeleteUser(res http.ResponseWriter, req *http.Request) {
 }
 
 func handleUpdateGroup(res http.ResponseWriter, req *http.Request) {
-	// handleUpdate(res, req, "http://localhost:8082/scim/v2/Groups")
-	handleUpdate(res, req, "http://"+req.Host+"/scim/v2/Groups")
+	handleUpdate(res, req, fmt.Sprintf("%s%s/scim/v2/Groups", getScheme(req.TLS), req.Host))
 }
 
 func handleUpdate(res http.ResponseWriter, req *http.Request, url string) {
@@ -290,8 +291,7 @@ func handleUpdate(res http.ResponseWriter, req *http.Request, url string) {
 
 func handleDeleteGroup(res http.ResponseWriter, req *http.Request) {
 	id := req.URL.Query().Get("id")
-	// err := sendDeleteToScim("http://localhost:8082/scim/v2/Groups/" + id)
-	err := sendDeleteToScim("http://" + req.Host + "/scim/v2/Groups/" + id)
+	err := sendDeleteToScim(fmt.Sprintf("%s%s/scim/v2/Groups/%s", getScheme(req.TLS), req.Host, id))
 	if err != nil {
 		log.Printf("handleDeleteGroup() error: %v\n", err)
 		res.WriteHeader(http.StatusInternalServerError)
@@ -309,12 +309,12 @@ func handleFlush(res http.ResponseWriter, req *http.Request) {
 		log.Panicf("Error converting epoch query param to int64: %v\n", err)
 		epoch64 = 0
 	}
+
 	now := time.Now()
-	// fmt.Printf("%v ~= %v\n", epoch, now.UnixMilli())
-	if now.UnixMilli()-epoch64 < 3000 {
-		fmt.Printf("PATH: %s\n", req.URL.Path)
+	if now.UnixMilli()-epoch64 < 30000 {
+		//log.Printf("PATH: %s\n", req.URL.Path)
 		if req.URL.Path == "/redis/flush" {
-			fmt.Println("Flushing Redis")
+			log.Println("Flushing Redis")
 			err := utils.FlushDB()
 			if err != nil {
 				res.WriteHeader(http.StatusForbidden)
@@ -322,14 +322,28 @@ func handleFlush(res http.ResponseWriter, req *http.Request) {
 				res.WriteHeader(http.StatusOK)
 			}
 		} else if req.URL.Path == "/messages/flush" {
-			fmt.Println("Flushing Messages")
+			log.Println("Flushing Messages")
 			messageLogs.FlushMessages()
 			res.WriteHeader(http.StatusOK)
 		}
 	} else {
 		res.WriteHeader(http.StatusForbidden)
 	}
+
 	res.Write(nil)
+}
+
+func handleHarGeneration(res http.ResponseWriter, req *http.Request) {
+	harType := req.URL.Query().Get("type")
+	bytes := messageLogs.GetHar(harType)
+	res.Header().Set("Content-Type", "application/octet-stream")
+	res.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.har", harType))
+	res.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
+	res.Header().Set("Cache-Control", "private")
+	res.Header().Set("Pragma", "private")
+	//res.Header().Set("Expires", "Mon, 26 Jul 2024 05:00:00 GMT")
+	res.WriteHeader(http.StatusOK)
+	res.Write(bytes)
 }
 
 func handleWebSocketUpgrade(res http.ResponseWriter, req *http.Request) {
@@ -437,8 +451,6 @@ func wsReader() {
 
 func getUsers(start, count string, req *http.Request) UsersTmpl {
 	ut := UsersTmpl{}
-
-	// lr, err := getListResponseResource(fmt.Sprintf("http://localhost:8082/scim/v2/Users?startIndex=%s&count=%s", start, count))
 	lr, err := getListResponseResource(fmt.Sprintf("http://%s/scim/v2/Users?startIndex=%s&count=%s", req.Host, start, count))
 	if err != nil {
 		ut.Error = err
@@ -457,8 +469,6 @@ func getUsers(start, count string, req *http.Request) UsersTmpl {
 
 func getGroups(start, count string, req *http.Request) GroupsTmpl {
 	gt := GroupsTmpl{}
-
-	// lr, err := getListResponseResource(fmt.Sprintf("http://localhost:8082/scim/v2/Groups?startIndex=%s&count=%s", start, count))
 	lr, err := getListResponseResource(fmt.Sprintf("http://%s/scim/v2/Groups?startIndex=%s&count=%s", req.Host, start, count))
 	if err != nil {
 		gt.Error = err
@@ -543,6 +553,7 @@ func getMessages(res http.ResponseWriter, req *http.Request, template string) {
 	messagesTmpl.ProxyEnabled = config.Server.Proxy_messages
 	messagesTmpl.ProxyPort = config.Server.Proxy_port
 	messagesTmpl.ProxyOrigin = config.Server.Proxy_origin
+	messagesTmpl.SNI = config.Server.Proxy_sni
 	if config.Server.Proxy_address != "" && config.Server.Proxy_port > 0 {
 		messagesTmpl.ProxySwitchEnabled = true
 	} else {
@@ -620,4 +631,12 @@ func getBody(req *http.Request) ([]byte, error) {
 
 	defer req.Body.Close()
 	return b, nil
+}
+
+func getScheme(tls *tls.ConnectionState) string {
+	if tls == nil {
+		return "http://"
+	} else {
+		return "https://"
+	}
 }

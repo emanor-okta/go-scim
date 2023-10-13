@@ -26,6 +26,7 @@ type Configuration struct {
 		Proxy_address  string
 		Proxy_port     int
 		Proxy_origin   string
+		Proxy_sni      string
 		ProxyDisabled  bool
 	}
 	Scim struct {

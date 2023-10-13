@@ -256,7 +256,7 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 }
 
 /*
-	Used by both Group/User requests to prepare either a list of members or groups to send to Redis
+Used by both Group/User requests to prepare either a list of members or groups to send to Redis
 */
 func buildGroupsMembersList(a []interface{}) ([]string, []string) {
 	mems := []string{}
