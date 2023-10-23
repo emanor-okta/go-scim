@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/emanor-okta/go-scim/apps"
 	messageLogs "github.com/emanor-okta/go-scim/server/log"
 	// br "github.com/google/brotli/go/cbrotli"
 )
@@ -151,10 +152,16 @@ func modifyResponseImpl(res *http.Response) error {
 	return nil
 }
 
-var i int = 0
+// var i int = 0
 
 // http handlers
 func handleProxy(res http.ResponseWriter, req *http.Request) {
+	// TODO - change based off of port binding - hack for now
+	if !strings.Contains(req.Host, "gw.oktamanor.net") {
+		apps.HandleApprouting(res, req, strings.Split(req.Host, ".")[0])
+		return
+	}
+
 	log.Printf("proxy: RequestURI=%s\n", req.RequestURI)
 	if !config.Server.Proxy_messages {
 		res.WriteHeader(int(http.StatusServiceUnavailable))

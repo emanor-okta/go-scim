@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"path"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -176,6 +177,7 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		usersTmpl := UsersTmpl{Error: err}
 		tpl.ExecuteTemplate(res, "users.gohtml", usersTmpl)
+		return
 	}
 	fmt.Println(totalUserCount)
 
@@ -187,6 +189,11 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 	start, current := getPaginationPage(page, items_per_page)
 	usersTmpl := getUsers(start, fmt.Sprintf("%d", items_per_page), req)
 	usersTmpl.PP = computePagePagination(current, int(totalUserCount), items_per_page)
+	if usersTmpl.Error != nil {
+		usersTmpl := UsersTmpl{Error: usersTmpl.Error}
+		tpl.ExecuteTemplate(res, "users.gohtml", usersTmpl)
+		return
+	}
 
 	// after call to GET /scim/v2/users set filter back to it's original value
 	config.WebMessageFilter.UserGetResponse = filterUsersResponse
@@ -213,6 +220,11 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 	start, current := getPaginationPage(page, items_per_page)
 	groupsTmpl := getGroups(start, fmt.Sprintf("%d", items_per_page), req)
 	groupsTmpl.PP = computePagePagination(current, int(totalGroupCount), items_per_page)
+	if groupsTmpl.Error != nil {
+		groupsTmpl := UsersTmpl{Error: groupsTmpl.Error}
+		tpl.ExecuteTemplate(res, "groups.gohtml", groupsTmpl)
+		return
+	}
 
 	// after call to GET /scim/v2/groups set filter back to it's original value
 	config.WebMessageFilter.GroupsGetResponse = filterGroupsResponse
@@ -242,12 +254,12 @@ func handleFilters(res http.ResponseWriter, req *http.Request) {
 // }
 
 func handleUpdateUser(res http.ResponseWriter, req *http.Request) {
-	handleUpdate(res, req, fmt.Sprintf("%s%s/scim/v2/Users", getScheme(req.TLS), req.Host))
+	handleUpdate(res, req, fmt.Sprintf("%s%s/scim/v2/Users", getScheme(req.TLS, req.Host), req.Host))
 }
 
 func handleDeleteUser(res http.ResponseWriter, req *http.Request) {
 	id := req.URL.Query().Get("id")
-	err := sendDeleteToScim(fmt.Sprintf("%s%s/scim/v2/Users/%s", getScheme(req.TLS), req.Host, id))
+	err := sendDeleteToScim(fmt.Sprintf("%s%s/scim/v2/Users/%s", getScheme(req.TLS, req.Host), req.Host, id))
 	if err != nil {
 		log.Printf("handleDeleteUser() error: %v\n", err)
 		res.WriteHeader(http.StatusInternalServerError)
@@ -259,7 +271,7 @@ func handleDeleteUser(res http.ResponseWriter, req *http.Request) {
 }
 
 func handleUpdateGroup(res http.ResponseWriter, req *http.Request) {
-	handleUpdate(res, req, fmt.Sprintf("%s%s/scim/v2/Groups", getScheme(req.TLS), req.Host))
+	handleUpdate(res, req, fmt.Sprintf("%s%s/scim/v2/Groups", getScheme(req.TLS, req.Host), req.Host))
 }
 
 func handleUpdate(res http.ResponseWriter, req *http.Request, url string) {
@@ -291,7 +303,7 @@ func handleUpdate(res http.ResponseWriter, req *http.Request, url string) {
 
 func handleDeleteGroup(res http.ResponseWriter, req *http.Request) {
 	id := req.URL.Query().Get("id")
-	err := sendDeleteToScim(fmt.Sprintf("%s%s/scim/v2/Groups/%s", getScheme(req.TLS), req.Host, id))
+	err := sendDeleteToScim(fmt.Sprintf("%s%s/scim/v2/Groups/%s", getScheme(req.TLS, req.Host), req.Host, id))
 	if err != nil {
 		log.Printf("handleDeleteGroup() error: %v\n", err)
 		res.WriteHeader(http.StatusInternalServerError)
@@ -451,7 +463,7 @@ func wsReader() {
 
 func getUsers(start, count string, req *http.Request) UsersTmpl {
 	ut := UsersTmpl{}
-	lr, err := getListResponseResource(fmt.Sprintf("http://%s/scim/v2/Users?startIndex=%s&count=%s", req.Host, start, count))
+	lr, err := getListResponseResource(fmt.Sprintf("%s%s/scim/v2/Users?startIndex=%s&count=%s", getScheme(req.TLS, req.Host), req.Host, start, count))
 	if err != nil {
 		ut.Error = err
 		return ut
@@ -469,7 +481,7 @@ func getUsers(start, count string, req *http.Request) UsersTmpl {
 
 func getGroups(start, count string, req *http.Request) GroupsTmpl {
 	gt := GroupsTmpl{}
-	lr, err := getListResponseResource(fmt.Sprintf("http://%s/scim/v2/Groups?startIndex=%s&count=%s", req.Host, start, count))
+	lr, err := getListResponseResource(fmt.Sprintf("%s%s/scim/v2/Groups?startIndex=%s&count=%s", getScheme(req.TLS, req.Host), req.Host, start, count))
 	if err != nil {
 		gt.Error = err
 		return gt
@@ -633,8 +645,16 @@ func getBody(req *http.Request) ([]byte, error) {
 	return b, nil
 }
 
-func getScheme(tls *tls.ConnectionState) string {
-	if tls == nil {
+func getScheme(tls *tls.ConnectionState, host string) string {
+	// is returning nil even when https - or because SSL termination and http from ALB to docker
+	/*
+		if tls == nil {
+			return "http://"
+		} else {
+			return "https://"
+		}
+	*/
+	if strings.Contains(host, "localhost") {
 		return "http://"
 	} else {
 		return "https://"

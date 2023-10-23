@@ -231,7 +231,7 @@ func handleNotSupported(req *http.Request, res *http.ResponseWriter) {
  * Mock OAuth Server
  */
 func handleAuthorizeReq(res http.ResponseWriter, req *http.Request) {
-	fmt.Printf("Received Request:\n%v\n", req.RequestURI)
+	log.Printf("Received Mock handle Authorize Request:\n%v\n", req.RequestURI)
 	s := req.URL.Query().Get("state")
 	r := req.URL.Query().Get("redirect_uri")
 	redir := fmt.Sprintf("%s?code=123456&state=%s", r, s)
@@ -239,6 +239,12 @@ func handleAuthorizeReq(res http.ResponseWriter, req *http.Request) {
 }
 
 func handleTokenReq(res http.ResponseWriter, req *http.Request) {
+	err := req.ParseForm()
+	if err != nil {
+		log.Printf("Error handleTokenReq.ParseForm: %s\n", err)
+	}
+	log.Printf("Received Mock handle Token Request:\n%v\nclient_id: %s, client_secret: %s\n",
+		req.RequestURI, req.Form.Get("client_id"), req.Form.Get("client_secret"))
 	tRes := struct {
 		Access_token  string `json:"access_token"`
 		Token_type    string `json:"token_type"`
