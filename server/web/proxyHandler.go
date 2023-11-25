@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/emanor-okta/go-scim/apps"
+	"github.com/emanor-okta/go-scim/filters"
 	messageLogs "github.com/emanor-okta/go-scim/server/log"
 	// br "github.com/google/brotli/go/cbrotli"
 )
@@ -98,6 +99,14 @@ func modifyResponseImpl(res *http.Response) error {
 	// get request id from http header and set status
 	id := res.Request.Header.Get(http_header_scim_id)
 	messageLogs.AddResponseStatus(id, res.StatusCode)
+
+	//TEST
+	if res.Request.Method == http.MethodPost {
+		manualFilter := filters.ManualFilter{}
+		manualFilter.PostResponse(res.Header, res.Cookies(), nil, res.Request.URL.RequestURI())
+		res.Header.Add("Set-Cookie", "MyCookie=4B89AC; Path=/; Secure; HttpOnly")
+	}
+	//END Test
 
 	// process response from origin
 	//header

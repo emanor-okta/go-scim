@@ -21,6 +21,7 @@ function intiializeWS() {
     socket.onopen = () => {
         console.log("Successfully Connected");
         // socket.send('{"Hi": "From the Client!"}')
+        wsPing();
     };
 
     socket.onmessage = onMessage;
@@ -92,4 +93,11 @@ function submitMessage() {
     if (messages.length > 0) {
         displayNextMessage();
     }
+}
+
+function wsPing() {
+    if (!socket) return;
+    if (socket.readyState !== 1) return;
+    sendMessage('{"uuid": "ping"}');
+    setTimeout(wsPing, 10000);
 }

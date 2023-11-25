@@ -49,7 +49,7 @@ type ProxyFilter interface {
 	GetRequest(http.Header, []byte, string) []byte
 	GetResponse(http.Header, []byte, string) []byte
 	PostRequest(http.Header, []byte, string) []byte
-	PostResponse(http.Header, []byte, string) []byte
+	PostResponse(http.Header, []*http.Cookie, []byte, string) []byte
 	PutRequest(http.Header, []byte, string) []byte
 	PutResponse(http.Header, []byte, string) []byte
 	OptionsRequest(http.Header, []byte, string) []byte

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/websocket"
 
@@ -150,35 +151,58 @@ func (f ManualFilter) GroupsIdPatchRequest(ops *v2.PatchOp, path string) {
 /*
  * ProxyFilter Implementations
  */
-func GetRequest(h http.Header, b []byte, path string) []byte {
+func (f ManualFilter) GetRequest(h http.Header, b []byte, path string) []byte {
 	return nil
 }
 
-func GetResponse(h http.Header, b []byte, path string) []byte {
+func (f ManualFilter) GetResponse(h http.Header, b []byte, path string) []byte {
 	return nil
 }
 
-func PostRequest(h http.Header, b []byte, path string) []byte {
+func (f ManualFilter) PostRequest(h http.Header, b []byte, path string) []byte {
 	return nil
 }
 
-func PostResponse(h http.Header, b []byte, path string) []byte {
+func (f ManualFilter) PostResponse(h http.Header, c []*http.Cookie, b []byte, path string) []byte {
+	fmt.Printf(">> FILTER %s <<\n", path)
+	if strings.Contains(path, "/token") {
+		//values := h.Get("Set-Cookie")
+		h.Del("set-cookie")
+		for _, v := range c {
+			fmt.Printf("  Set-Cookie -> %+v\n", v)
+			if v.Name == "idx" {
+				fmt.Printf("Its idx...")
+				if v.SameSite != http.SameSiteNoneMode {
+					fmt.Println("SameSite=none not set, setting...")
+					v.SameSite = http.SameSiteStrictMode
+					fmt.Printf("  Set-Cookie -> %+v\n", v)
+					fmt.Printf("%+v\n", v.Unparsed)
+					// need to update set-cookie header ?
+					h.Add("Set-Cookie", fmt.Sprintf("%s;SameSite=None", v.Raw))
+				} else {
+					h.Add("Set-Cookie", v.Raw)
+				}
+			} else {
+				h.Add("Set-Cookie", v.Raw)
+			}
+		}
+	}
 	return nil
 }
 
-func PutRequest(h http.Header, b []byte, path string) []byte {
+func (f ManualFilter) PutRequest(h http.Header, b []byte, path string) []byte {
 	return nil
 }
 
-func PutResponse(h http.Header, b []byte, path string) []byte {
+func (f ManualFilter) PutResponse(h http.Header, b []byte, path string) []byte {
 	return nil
 }
 
-func OptionsRequest(h http.Header, b []byte, path string) []byte {
+func (f ManualFilter) OptionsRequest(h http.Header, b []byte, path string) []byte {
 	return nil
 }
 
-func OptionsResponse(h http.Header, b []byte, path string) []byte {
+func (f ManualFilter) OptionsResponse(h http.Header, b []byte, path string) []byte {
 	return nil
 }
 

@@ -24,7 +24,7 @@
 <script type="text/javascript">
 
 // TODO: UPDATE THESE FOR YOUR OKTA TENANT
-var baseOktaURL = "https://gw.oktamanor.net"// "https://emanor-oie.oktapreview.com";
+var baseOktaURL = "https://emanor-oie.oktapreview.com";
 var appClientID = "0oa1qcts70mVXVA6Y1d7";
 
 //var appClientID = "0oa6cj355hlckMydk1d7";
@@ -195,10 +195,10 @@ var appClientID = "0oa1qcts70mVXVA6Y1d7";
   */
 
   
-showSignIn();
+//showSignIn();
       
-  function showSignIn() {
- 
+  function showSignIn(url, mode, redirect) {
+    /*
     oktaSignIn.showSignInToGetTokens({
       el: '#okta-login-container'
     }).then(function(tokens) {
@@ -209,6 +209,40 @@ showSignIn();
     }).catch(function(error) {
       console.log(error);
     });
+    */
+
+      fetch(url, {
+      //fetch('https://gw.oktamanor.net/oauth2/default/v1/authorize', {
+        method: 'GET', // *GET, POST, PUT, DELETE, etc.
+        mode: mode, // no-cors, *cors, same-origin
+        cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
+        //credentials: 'include', // include, *same-origin, omit
+        headers: {
+          //'Access-Control-Expose-Headers': 'Location' <- server set
+          //'Content-Type': 'application/json'
+          //'Content-Type': 'application/x-www-form-urlencoded',
+          //'Access-Control-Request-Headers': 'x-okta-user-agent-extended',
+          //'Authorization': 'Basic ' + btoa('0oa1qc5dey5nsTYa35d7' + ':' + 'Q1v3Qf95vvUpVKHLc5z4XMmR2VP5svIUIWW4vgeW')
+        },
+        redirect: redirect, // manual, *follow, error
+        //referrerPolicy: 'strict-origin-when-cross-origin', // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
+        //body: JSON.stringify(data) // body data type must match "Content-Type" header
+        //body: 'grant_type=authorization_code&client_id=0oa5ss1blqlDij7Zv1d7&redirect_uri=http://localhost:8080/index5_1_1.html&code_verifier=6d83ffd7e7e5cbfa69b547f4177a1de82a8d262276b&code=U_v5qLQ6CxJktXwk3riJPhVRDF3O9Vf9C2qH3_KcpT0'
+        //body: 'grant_type=authorization_code&redirect_uri=http://localhost:8080/index5_1_1.html&code=U_v5qLQ6CxJktXwk3riJPhVRDF3O9Vf9C2qH3_KcpT0'
+        //body: 'grant_type=client_credentials&scope=read' //&client_id=0oa1qc5dey5nsTYa35d7&client_secret=Q1v3Qf95vvUpVKHLc5z4XMmR2VP5svIUIWW4vgeW'
+      })
+      .then(resp => {
+        console.log('Fetch Response:');
+        console.log(resp);
+        console.log(...resp.headers);
+        if (resp.type && resp.type === 'opaqueredirect') {
+          window.location = 'https://httpbin.org/status/302';
+        }
+        //console.log(resp.headers.values().next().value);
+      }).catch(err => {
+        console.log('Fetch Error:');
+        console.log(err);
+      });    
    
 
 
@@ -248,7 +282,7 @@ console.log('In showSignin()');
    
     oktaSignIn.authClient.signOut({
       clearTokensBeforeRedirect: true,
-      postLogoutRedirectUri: 'https://gw.oktamanor.net/widget-appembed-A.html'
+      postLogoutRedirectUri: 'https://emanor-oie.oktapreview.com/widget-appembed-A.html'
     });
     
     //xhr request
