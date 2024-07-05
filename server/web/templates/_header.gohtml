@@ -19,13 +19,8 @@
 
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
   <div class="container-fluid">
-    <!--a class="navbar-brand" href="#">Navbar</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarSupportedContent"-->
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-        <li class="nav-item">
+        {{/* <li class="nav-item">
           <a class="nav-link" href="/messages">Messages</a>
         </li>
         <li class="nav-item">
@@ -40,26 +35,36 @@
           </a>
           <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
             <li><a class="dropdown-item" href="/filters">Manual</a></li>
-            <!--li><a class="dropdown-item" href="#">Another action</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item" href="#">Something else here</a></li-->
+          </ul>
+        </li> */}}
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            SCIM
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+            <li><a class="dropdown-item" href="/messages">Messages</a></li>
+            <li><a class="dropdown-item" href="/users">Users</a></li>
+            <li><a class="dropdown-item" href="/groups">Groups</a></li>
+            <li><a class="dropdown-item" href="/filters">Filter</a></li>
           </ul>
         </li>
-        <!--li class="nav-item">
-          <a class="nav-link" href="/config">Config</a>
-        </li-->
-        <li class="nav-item">
-          <a class="nav-link" href="/proxy">Reverse Proxy</a>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            GW / Reverse Proxy
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+            <li><a class="dropdown-item" href="/proxy">Configuration / Messages</a></li>
+            <li><a class="dropdown-item" href="/proxyfilter">Filter</a></li>
+          </ul>
         </li>
+        {{/* <li class="nav-item">
+          <a class="nav-link" href="/proxy">Reverse Proxy</a>
+        </li> */}}
       </ul>
       <form class="d-flex">
-        <!--input class="form-control me-2" type="search" placeholder="Search" aria-label="Search">
-        <button class="btn btn-outline-success" type="submit">Search</button-->
         <button id="clear-msg-button" type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#flushMsgModal">Clear Messages</button>
-        <!--button id="flush-db-button" type="submit" class="btn btn-outline-danger" onclick="flushDB();return false" enabled>Flush Redis</button-->
         <button id="flush-db-button" type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#flushDbModal">Flush Redis</button>
       </form>
-    <!--/div-->
     
 
     <div class="modal fade" id="flushDbModal" tabindex="-1" aria-labelledby="flushDbModalLabel" aria-hidden="true">

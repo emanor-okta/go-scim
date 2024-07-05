@@ -187,15 +187,16 @@ func AddUser(doc []byte, userName, uuid string) error {
 func UpdateUser(uuid string, doc []byte, active bool, userElement string, ids, groups []string) error {
 	var luaScript string
 	args := []interface{}{doc, userElement, len(ids)}
-	if active {
-		luaScript = luaScripts.LuaUpdateUuserActive
-		for i, v := range ids {
-			args = append(args, v)
-			args = append(args, groups[i])
-		}
-	} else {
-		luaScript = luaScripts.LuaUpdateUuserInActive
+	// Remove to Test removing user from groups on de-activate
+	// if active {
+	luaScript = luaScripts.LuaUpdateUuserActive
+	for i, v := range ids {
+		args = append(args, v)
+		args = append(args, groups[i])
 	}
+	// } else {
+	// 	luaScript = luaScripts.LuaUpdateUuserInActive
+	// }
 
 	if err := rdb.EvalSha(ctx, luaScript, []string{uuid}, args...).Err(); err != nil {
 		if err != redis.Nil {

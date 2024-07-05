@@ -1,6 +1,6 @@
 redis:
-    # address: localhost:6379
-    address: redis-scim:6379
+    address: localhost:6379
+    # address: redis-scim:6379
     password: ""
     db: 0
 server:
@@ -15,3 +15,5 @@ server:
     proxy_address: ":8084"
 scim:
     enable_groups: true
+    users_endpoint: "/goscim/scim/v2/Users"
+    groups_endpoint: "/goscim/scim/v2/Groups"

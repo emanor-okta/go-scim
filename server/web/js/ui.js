@@ -222,6 +222,30 @@ function sendPost(url, msg, success) {
   });
 }
 
+function sendDelete(url, success, fail) {
+  const options = {
+    method: "DELETE",
+  };
+  const request = new Request(url, options);
+  fetch(request)
+  .then(response => {
+    console.log(response);
+    if (!response.ok) {
+      response.text()
+      .then(d => {
+        alert('Failed sending DELETE to: ' + url +'\nStatus: ' + response.statusText + '\nError: ' + d);
+      });
+      fail();
+    } else {
+     success();
+    }
+  }).catch(err => {
+    console.log(err);
+    alert('Failed sending DELETE to: ' + url +', error: ' + err);
+    fail();
+  });
+}
+
 function success() {
   window.location.reload();
 }

@@ -52,7 +52,7 @@ type opType byte
 
 const (
 	modify opType = iota
-	delete
+	del
 	array_insert
 	array_append
 	array_slice_del
@@ -172,7 +172,7 @@ func generateInstruction(op opType, paths []string, value interface{}) string {
 					s = fmt.Sprintf("%s%s", s, mapKey(v))
 
 				}
-			case delete:
+			case del:
 				// s = fmt.Sprintf("delete(m, \"%s\")", s)
 			case array_append:
 			case array_insert:
@@ -210,7 +210,7 @@ func generateUserPostRequest(f filter) string {
 		paths := strings.Split(v.jsonPath, ".")
 		fmt.Printf("%v, length:%v\n", paths, len(paths))
 		if v.jsonPath == "." {
-			if v.op == delete {
+			if v.op == del {
 				// delete all keys from root
 				s = fmt.Sprintf("%sm = make(map[string]interface{})\n", s)
 			}

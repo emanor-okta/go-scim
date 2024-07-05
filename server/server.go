@@ -53,14 +53,17 @@ func StartServer(c *utils.Configuration) {
 	messageLogs.Init()
 	middlewares = append(middlewares, logMessagesMiddleware, logMessageResponseSudoMiddleware)
 
-	http.HandleFunc("/scim/v2/Users", addMiddleware(handleUsers, middlewares...))
-	http.HandleFunc("/scim/v2/Users/", addMiddleware(handleUser, middlewares...))
-	http.HandleFunc("/scim/v2/Groups", addMiddleware(handleGroups, middlewares...))
-	http.HandleFunc("/scim/v2/Groups/", addMiddleware(handleGroup, middlewares...))
+	http.HandleFunc("/goscim/scim/v2/Users", addMiddleware(handleUsers, middlewares...))
+	http.HandleFunc("/goscim/scim/v2/Users/", addMiddleware(handleUser, middlewares...))
+	http.HandleFunc("/goscim/scim/v2/Groups", addMiddleware(handleGroups, middlewares...))
+	http.HandleFunc("/goscim/scim/v2/Groups/", addMiddleware(handleGroup, middlewares...))
 
 	// Mock OAuth Server Handlers
 	http.HandleFunc("/mock/oauth2/v1/authorize", handleAuthorizeReq)
 	http.HandleFunc("/mock/oauth2/v1/token", handleTokenReq)
+
+	// SSF Receiver
+	http.HandleFunc("/ssf/receiver", handleSSFReq)
 
 	/*
 	 * Redirect testing. Currently PUT does not follow by the client
@@ -87,7 +90,7 @@ func StartServer(c *utils.Configuration) {
 	http.HandleFunc("/scim/v1/Groups", func(res http.ResponseWriter, req *http.Request) {
 		handleRedirect(req, res)
 	})
-	http.HandleFunc("/scim/v1/Groups/", func(res http.ResponseWriter, req *http.Request) {
+	http.HandleFunc("/scimmy/scim/v1/Groups/", func(res http.ResponseWriter, req *http.Request) {
 		handleRedirect(req, res)
 	})
 	/*
@@ -245,20 +248,43 @@ func handleTokenReq(res http.ResponseWriter, req *http.Request) {
 	}
 	log.Printf("Received Mock handle Token Request:\n%v\nclient_id: %s, client_secret: %s\n",
 		req.RequestURI, req.Form.Get("client_id"), req.Form.Get("client_secret"))
-	tRes := struct {
-		Access_token  string `json:"access_token"`
-		Token_type    string `json:"token_type"`
-		Expires_in    int    `json:"expires_in"`
-		Scope         string `json:"scope"`
-		Refresh_token string `json:"refresh_token"`
-	}{
-		"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
-		"Bearer",
-		3600,
-		"scim",
-		"mock_refresh_token_value",
+	// TEST - dont return new refresh
+	log.Printf("Grant Type: %s\n", req.Form.Get("grant_type"))
+	var tRes any
+	grantType := req.Form.Get("grant_type")
+	if grantType == "refresh_token" {
+		tRes = struct {
+			Access_token string `json:"access_token"`
+			Token_type   string `json:"token_type"`
+			Expires_in   int    `json:"expires_in"`
+			Scope        string `json:"scope"`
+		}{
+			"eyJhbCI6IkhTMjU2IiwidHlwIjoiSlciLCJhbGciOiJIUzI1NiJ9.eyJzIjoiMTIzNDU2Nzg5MCIsIm4iOiJKb2huIERvZSIsImkiOjE1MTYyMzkwMjJ9.fdErMOJ0QvrD9_vnj2Ih6trMx9cyDsY-mLntzjPFpOg",
+			// "abcde",
+			"Bearer",
+			600,
+			"scim",
+		}
+	} else {
+		//
+		//tRes := struct {
+		tRes = struct {
+			Access_token  string `json:"access_token"`
+			Token_type    string `json:"token_type"`
+			Expires_in    int    `json:"expires_in"`
+			Scope         string `json:"scope"`
+			Refresh_token string `json:"refresh_token"`
+		}{
+			"eyJhbCI6IkhTMjU2IiwidHlwIjoiSlciLCJhbGciOiJIUzI1NiJ9.eyJzIjoiMTIzNDU2Nzg5MCIsIm4iOiJKb2huIERvZSIsImkiOjE1MTYyMzkwMjJ9.fdErMOJ0QvrD9_vnj2Ih6trMx9cyDsY-mLntzjPFpOg",
+			// "abcde",
+			"Bearer",
+			600,
+			"scim offline_access",
+			"mock_refresh_token_value",
+		}
 	}
 	res.Header().Add("Content-Type", "application/json")
 	b, _ := json.Marshal(tRes)
 	res.Write(b)
+	// res.WriteHeader(http.StatusInternalServerError)
 }

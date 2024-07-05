@@ -1,7 +1,9 @@
 var socket;
+var mode;
+var needsBase64;
 const messages = [];
 
-function intiializeWS() {
+function intiializeWS(whichMode) {
     // socket = new WebSocket("ws://localhost:8082/filters/ws");
     console.log("Attempting Connection...");
     if (window.location.protocol.includes("https")) {
@@ -18,6 +20,8 @@ function intiializeWS() {
         socket = new WebSocket("wss://" + location.host + "/filters/ws");
     }*/
 
+    mode = whichMode;
+
     socket.onopen = () => {
         console.log("Successfully Connected");
         // socket.send('{"Hi": "From the Client!"}')
@@ -27,7 +31,11 @@ function intiializeWS() {
     socket.onmessage = onMessage;
     socket.onclose = onClose;
     socket.onerror = onError;
-    document.getElementById('submitMsg').disabled = true;
+    if (mode === 'proxy') {
+        document.getElementById('proxySubmitMsg').disabled = true;
+    } else {
+        document.getElementById('submitMsg').disabled = true;
+    }
 }
 
 function onMessage(event) {
@@ -36,8 +44,13 @@ function onMessage(event) {
     console.log('message received')
     console.log(event.data);
     messages.push(event.data);
+    console.log('mode: ' + mode);
     if (messages.length === 1) {
-        displayNextMessage();
+        if (mode === "proxy") {
+            displayNextProxyMessage();
+        } else {
+            displayNextMessage();
+        }
     }
 }
 
@@ -55,6 +68,43 @@ function sendMessage(msg) {
 }
 
 function displayNextMessage() {
+    // //var data = messages.shift();
+    // var data = messages[0];
+    // var obj = JSON.parse(data);
+    // var uuid = obj.uuid;
+    // var reqType = obj.requestType;
+    // console.log(uuid + " : " + reqType);
+    // delete obj.uuid;
+    // delete obj.requestType;
+    // var str = JSON.stringify(obj, undefined, 4);
+    var resp = dequeueNextMessage();
+    document.getElementById('messageArea').value = JSON.stringify(resp.message, undefined, 4);
+    document.getElementById('uuid').value = resp.uuid;
+    document.getElementById('reqType').innerText = resp.type;
+    document.getElementById('submitMsg').disabled = false;
+}
+
+function displayNextProxyMessage() {
+    var resp = dequeueNextMessage();
+    /*
+        if resp.message.base64Content content is non-json, base64 decode
+    */
+    if (resp.message.base64Content) {
+        document.getElementById('proxyMessageArea').value = Base64.decode(resp.message.base64Content);
+        needsBase64 = true;
+    } else {
+        document.getElementById('proxyMessageArea').value = JSON.stringify(resp.message, undefined, 4);
+    }
+
+    // document.getElementById('proxyMessageArea').value = resp.message;
+    // document.getElementById('proxyMessageArea').value = JSON.stringify(resp.message, undefined, 4);
+    document.getElementById('proxyUuid').value = resp.uuid;
+    document.getElementById('proxyReqType').innerText = resp.type;
+    document.getElementById('proxySubmitMsg').disabled = false;
+}
+
+function dequeueNextMessage() {
+    needsBase64 = false;
     // var data = messages.shift();
     var data = messages[0];
     var obj = JSON.parse(data);
@@ -63,36 +113,90 @@ function displayNextMessage() {
     console.log(uuid + " : " + reqType);
     delete obj.uuid;
     delete obj.requestType;
-    var str = JSON.stringify(obj, undefined, 4);
-    document.getElementById('messageArea').value = str;
-    document.getElementById('uuid').value = uuid;
-    document.getElementById('reqType').innerText = reqType;
-    document.getElementById('submitMsg').disabled = false;
+    // var str = JSON.stringify(obj, undefined, 4);
+    // return {message: str, uuid: uuid, type: reqType};
+    return {message: obj, uuid: uuid, type: reqType};
 }
 
 function submitMessage() {
-    document.getElementById('submitMsg').disabled = true;
-    var uuid = document.getElementById('uuid').value;
-    var msg = document.getElementById('messageArea').value;
+    // document.getElementById('submitMsg').disabled = true;
+    // var uuid = document.getElementById('uuid').value;
+    // var msg = document.getElementById('messageArea').value;
+    // var str;
+    // try {
+    //     var obj = JSON.parse(msg);
+    //     obj["uuid"] = uuid;
+    //     str = JSON.stringify(obj);
+    // } catch (error) {
+    //     console.log('Error with Json: ' + error);
+    //     alert('Error with Json: ' + error);
+    //     document.getElementById('submitMsg').disabled = false;
+    //     return;
+    // }
+    // document.getElementById('messageArea').value = "";
+    // document.getElementById('uuid').value = "";
+    // document.getElementById('reqType').innerText = "";
+    // sendMessage(str);
+    // messages.shift();
+    // if (messages.length > 0) {
+    //     displayNextMessage();
+    // }
+
+    var str = parseMessage(document.getElementById('submitMsg'), document.getElementById('messageArea'), document.getElementById('uuid'));
+    if (!str) {
+        return;
+    }
+    document.getElementById('reqType').innerText = "";
+    sendMessage(str);
+    messages.shift();
+    if (messages.length > 0) {
+        //displayNextMessage();
+        if (mode === "proxy") {
+            displayNextProxyMessage();
+        } else {
+            displayNextMessage();
+        }
+    }
+}
+
+function submitProxyMessage() {
+    var str = parseMessage(document.getElementById('proxySubmitMsg'), document.getElementById('proxyMessageArea'), document.getElementById('proxyUuid'));
+    if (!str) {
+        return;
+    }
+    document.getElementById('proxyReqType').innerText = "";
+    sendMessage(str);
+    messages.shift();
+    if (messages.length > 0) {
+        displayNextProxyMessage();
+    }
+}
+
+function parseMessage(submitElement, messageElement, uuidElement) {
+    submitElement.disabled = true;
+    var uuid = uuidElement.value;
+    console.log('uuid: ' + uuid)
+    var msg = messageElement.value;
+    if (needsBase64) {
+        msg = `{"base64Content": "${Base64.encode(msg)}"}`
+    }
+    console.log(msg)
     var str;
     try {
         var obj = JSON.parse(msg);
         obj["uuid"] = uuid;
         str = JSON.stringify(obj);
+        console.log('str: ' + str)
     } catch (error) {
         console.log('Error with Json: ' + error);
         alert('Error with Json: ' + error);
-        document.getElementById('submitMsg').disabled = false;
+        submitElement.disabled = false;
         return;
     }
-    document.getElementById('messageArea').value = "";
-    document.getElementById('uuid').value = "";
-    document.getElementById('reqType').innerText = "";
-    sendMessage(str);
-    messages.shift();
-    if (messages.length > 0) {
-        displayNextMessage();
-    }
+    messageElement.value = "";
+    uuidElement.value = "";
+    // document.getElementById('proxyReqType').innerText = "";
+    return str;
 }
 
 function wsPing() {

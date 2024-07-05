@@ -1,29 +1,14 @@
 {{template "header" .}}
 
 
-{{/* <div id="content" class="ui text container"> */}}
 <div id="content" class="ui text container-fluid">
   
-  {{/* <div class="container"> */}}
     <div class="row p-3">
-      {{/* <div class="col-4">
-        <h2>Proxy Messages</h2>
-      </div> */}}
-     
-      {{/* <div class="col-9 g-4"> */}}
-        
-        {{/* <div class="row g-4">
-          <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="LogMessages" onclick="logMessagesToggled()" {{if .Enabled}}checked{{end}}>
-            <label class="form-check-label" for="LogMessages">Enable SCIM Message Logging</label>
-          </div>
-        </div> */}}
-
+    
         {{$emptyOrigin := ""}}
-        {{/* <div class="row"> */}}
           <div class="form-check form-switch col-2">
             <input class="form-check-input" type="checkbox" id="ProxyLogMessages" onclick="logProxyMessagesToggled()" {{if .ProxyEnabled}}checked{{end}}>
-            <label class="form-check-label" for="ProxyLogMessages">Enable Proxy Logging</label>
+            <label class="form-check-label" for="ProxyLogMessages">Enable Proxy</label>
           </div>
           <div class="col-2">
             <input type="text" id="Port" class="form-control" {{if (gt .ProxyPort 0)}}value="{{.ProxyPort}}"{{else}}placeholder="<proxy_port>"{{end}} {{if .ProxyEnabled}}disabled{{end}}>
@@ -34,10 +19,7 @@
           <div class="col-3">
             <input type="text" id="SNI" class="form-control" {{if (ne .SNI $emptyOrigin)}}value="{{.SNI}}"{{else}}placeholder="<sni_domain_name>"{{end}} {{if .ProxyEnabled}}disabled{{end}}>
           </div>
-        {{/* </div> */}}
-
-      {{/* </div> */}}
-
+   
       <div class="col-2">
         <select class="form-select" aria-label="No Auto Refresh" id="AutoRefresh">
           <option selected>Auto Refresh Off</option>
@@ -49,7 +31,6 @@
       </div>
 
     </div>
-  {{/* </div>   */}}
   
   {{$entries := .Messages | len -}}
   {{ if gt $entries 0 }}

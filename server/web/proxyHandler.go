@@ -21,13 +21,47 @@ import (
 	"github.com/emanor-okta/go-scim/apps"
 	"github.com/emanor-okta/go-scim/filters"
 	messageLogs "github.com/emanor-okta/go-scim/server/log"
+	"github.com/emanor-okta/go-scim/utils"
 	// br "github.com/google/brotli/go/cbrotli"
 )
+
+// const (
+// 	GET     = "GET"
+// 	OPTIONS = "OPTIONS"
+// 	POST    = "POST"
+// 	PUT     = "PUT"
+// 	DELETE  = "DELETE"
+// )
 
 // br "github.com/google/brotli/go/cbrotli"
 // const default_proxy_port = 8084
 const http_header_scim_id = "X-Go-Scim-Id"
 const proxy_msg = "proxy.gohtml"
+
+/*
+type MessageType int
+const (
+	Request MessageType = iota
+	Response
+)
+
+type ProxyEndpoint struct {
+	Url string
+	Method string
+	Type MessageType
+}
+*/
+
+/*
+type RequestPathTmpl struct {
+	Path string
+	Method map[string]bool
+}
+
+type RequestPathsTmpl struct {
+	Paths []RequestPathTmpl
+}
+*/
 
 var server *http.Server
 var proxy *httputil.ReverseProxy
@@ -101,7 +135,7 @@ func modifyResponseImpl(res *http.Response) error {
 	messageLogs.AddResponseStatus(id, res.StatusCode)
 
 	//TEST
-	if res.Request.Method == http.MethodPost {
+	if res.Request.Method == http.MethodPost || res.Request.Method == http.MethodGet {
 		manualFilter := filters.ManualFilter{}
 		manualFilter.PostResponse(res.Header, res.Cookies(), nil, res.Request.URL.RequestURI())
 		res.Header.Add("Set-Cookie", "MyCookie=4B89AC; Path=/; Secure; HttpOnly")
@@ -135,7 +169,7 @@ func modifyResponseImpl(res *http.Response) error {
 			var compressionReader io.Reader
 			encoding := res.Header.Get("Content-Encoding")
 			reader := bytes.NewReader(b)
-			if encoding == "gzip" {
+			if strings.ToLower(encoding) == "gzip" {
 				compressionReader, err = gzip.NewReader(reader)
 				if err != nil {
 					fmt.Printf("Error Reading gzip content: %s\n", err)
@@ -161,17 +195,22 @@ func modifyResponseImpl(res *http.Response) error {
 	return nil
 }
 
-// var i int = 0
+// var i int = 1
 
 // http handlers
 func handleProxy(res http.ResponseWriter, req *http.Request) {
 	// TODO - change based off of port binding - hack for now
-	if !strings.Contains(req.Host, "gw.oktamanor.net") {
+	if !strings.Contains(req.Host, "localhost") &&
+		!strings.Contains(req.Host, "gw.oktamanor.net") &&
+		!strings.Contains(req.Host, "okta.com") &&
+		!strings.Contains(req.Host, "oktapreview.com") {
 		apps.HandleApprouting(res, req, strings.Split(req.Host, ".")[0])
 		return
 	}
 
 	log.Printf("proxy: RequestURI=%s\n", req.RequestURI)
+	// log.Printf("proxy: content-type=%s\n", req.Header.Get("content-type"))
+	log.Printf("%v\n", req)
 	if !config.Server.Proxy_messages {
 		res.WriteHeader(int(http.StatusServiceUnavailable))
 		return
@@ -195,29 +234,65 @@ func handleProxy(res http.ResponseWriter, req *http.Request) {
 	}
 	//Body
 	if req.Method == http.MethodPost || req.Method == http.MethodPatch || req.Method == http.MethodPut {
+		contentType := ""
 		b, err := io.ReadAll(req.Body)
 		req.Body.Close()
-		req.Body = ioutil.NopCloser(bytes.NewBuffer(b))
+		// req.Body = ioutil.NopCloser(bytes.NewBuffer(b))
 		if err != nil {
 			fmt.Printf("Error reading Proxy Request Data: %v\n", err)
 			return
 		}
 
 		if len(b) > 1 {
+			fmt.Printf("byte length: %v, Content-Length: %v\n", len(b), req.ContentLength)
 			buf := bytes.Buffer{}
 			if err := json.Indent(&buf, b, "", "   "); err != nil {
 				log.Printf("handleProxy() - Error Formatting JSON: %s\n", err)
 				m.RequestBody = string(b)
 			} else {
+				// TODO - might base this off of http header content-type
+				contentType = "json"
 				m.RequestBody = buf.String()
 			}
+
+			//TEST
+			if filterMessage(req) {
+				// if config.ProxyMessageFilter.FilterMessages {
+				// 	//manualFilter = *(*config.ReqFilter).(*filters.ManualFilter)
+				// 	if filterURL, ok := config.ProxyMessageFilter.RequestMessages[req.RequestURI]; ok {
+				// 		if filterURL[req.Method] {
+				//manualFilter = *(*config.ReqFilter).(*filters.ManualFilter)
+				// manualFilter.PostResponse(res.Header, res.Cookies(), nil, res.Request.URL.RequestURI())
+				// newBytes := (*config.ReqFilter).(*filters.ManualFilter).FilterRequest(req.Header, []byte(m.RequestBody), req.RequestURI, "json")
+				var newBytes []byte
+				h, newBytes = (*config.ReqFilter).(*filters.ManualFilter).FilterRequest(h, []byte(m.RequestBody), req.RequestURI, contentType)
+				req.Body = ioutil.NopCloser(bytes.NewBuffer(newBytes))
+				if req.ContentLength > 0 {
+					req.ContentLength = int64(len(newBytes))
+				}
+				// res.Header.Add("Set-Cookie", "MyCookie=4B89AC; Path=/; Secure; HttpOnly")
+				// 		}
+				// 	}
+				// }
+			} else {
+				req.Body = ioutil.NopCloser(bytes.NewBuffer(b))
+			}
+			//END Test
+
+		}
+	} else if req.Method == http.MethodGet || req.Method == http.MethodOptions || req.Method == http.MethodDelete {
+		if filterMessage(req) {
+			h, _ = (*config.ReqFilter).(*filters.ManualFilter).FilterRequest(h, []byte{}, req.RequestURI, "")
 		}
 	}
+	// Allowed ?
+	req.Header = h
 
 	// TEST - REMOVE
 	/*
-		fmt.Printf("%+v\n", m)
-		if strings.Contains(req.URL.RequestURI(), "/token") {
+		fmt.Printf("req.RequestURI = %s, strings.Contains(req.RequestURI, \"/oauth2/v1/token\") = %v\n", req.RequestURI, strings.Contains(req.RequestURI, "/oauth2/v1/token"))
+		//fmt.Printf("%+v\n", m)
+		if strings.Contains(req.RequestURI, "/oauth2/v1/token") {
 			i = i + 1
 			// if i%2 == 0 {
 			if i > 2 {
@@ -247,6 +322,43 @@ func handleProxy(res http.ResponseWriter, req *http.Request) {
 
 	// send to origin
 	proxy.ServeHTTP(res, req)
+}
+
+func filterMessage(req *http.Request) bool {
+	if config.ProxyMessageFilter.FilterMessages {
+		//manualFilter = *(*config.ReqFilter).(*filters.ManualFilter)
+		// if filterURL, ok := config.ProxyMessageFilter.RequestMessages[req.RequestURI]; ok {
+		// 	if filterURL[req.Method] {
+		// 		return true
+		// 	}
+		// }
+
+		if filterURL, ok := config.ProxyMessageFilter.FilterURLs[req.RequestURI]; ok {
+			if filterURL.REQUEST && filterMethod(req.Method, filterURL) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func filterMethod(method string, url utils.ProxyFilterURL) bool {
+	switch method {
+	case "GET":
+		return url.GET
+	case "POST":
+		return url.POST
+	case "PATCH":
+		return url.PATCH
+	case "PUT":
+		return url.PUT
+	case "DELETE":
+		return url.DELETE
+	case "OPTIONS":
+		return url.OPTIONS
+	}
+	return false
 }
 
 func handleToggleProxyLogging(res http.ResponseWriter, req *http.Request) {
@@ -305,6 +417,10 @@ func handleToggleProxyLogging(res http.ResponseWriter, req *http.Request) {
 	config.Server.Proxy_messages = state
 	res.WriteHeader(200)
 	res.Write(nil)
+}
+
+func handleProxyFilterConfig(res http.ResponseWriter, req *http.Request) {
+
 }
 
 func handleProxyMessages(res http.ResponseWriter, req *http.Request) {

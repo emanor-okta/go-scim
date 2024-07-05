@@ -46,6 +46,10 @@ type ReqFilter interface {
 }
 
 type ProxyFilter interface {
+	// FilterRequest(http.Header, []byte, string, string) []byte
+	FilterRequest(map[string][]string, []byte, string, string) (map[string][]string, []byte)
+	FilterResponse(http.Header, []*http.Cookie, []byte, string) []byte
+
 	GetRequest(http.Header, []byte, string) []byte
 	GetResponse(http.Header, []byte, string) []byte
 	PostRequest(http.Header, []byte, string) []byte

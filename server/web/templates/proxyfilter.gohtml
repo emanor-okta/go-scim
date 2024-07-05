@@ -1,0 +1,340 @@
+{{template "header" .}}
+
+<script src="js/ws.js" type="text/javascript"></script>
+
+<div id="content" class="ui text container">
+  <h2>Proxy Filters</h2>
+
+  <form>
+    <fieldset>
+      <legend>Message</legend>
+      <p><b><span style="color:gray">Message Type: </span></b><span id="proxyReqType" style="color:blue"></span></p>
+      
+      <div class="row">
+        <h5>HTTP Headers:</h5>
+        <div class="col-md-8">
+          <textarea class="form-control" id="proxyMessageHeaders" name="proxyMessageHeaders" rows="8"></textarea>
+        </div>
+        <h5>Message:</h5>
+        <div class="col-md-8">
+          <!--textarea id="messageArea" name="messageArea" cols=75 rows=20 wrap="off"></textarea-->
+          <textarea class="form-control" id="proxyMessageArea" name="proxyMessageArea" rows="20"></textarea>
+        </div>
+        <div class="col-md-4">
+          <h3>URIs To Filter</h3>
+          <hr/>
+
+         <button type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#urlFilterModal">Add URL To Filter</button>
+          <!--button type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#flushMsgModal">Clear Messages</button-->
+        
+            <hr/>
+            <div>
+              <div class="accordion accordion-flush" id="accordionFilterUrls">
+                {{range $i, $filterURL := .URLs}}
+                  <div class="accordion-item">
+                    <h2 class="accordion-header" id="flush-heading-{{$i}}">
+                      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#flush-collapse-{{$i}}" aria-expanded="false" aria-controls="flush-collapse-{{$i}}">
+                        {{$filterURL.URL}}
+                      </button>
+                    </h2>
+                    <div id="flush-collapse-{{$i}}" class="accordion-collapse collapse" aria-labelledby="flush-heading-{{$i}}" data-bs-parent="#accordionFilterUrls">
+                      <div class="accordion-body">
+                        {{/* <textarea class="form-control" id="messageArea" name="messageArea" rows="5">blah blah</textarea> */}}
+                        <form>
+                           <div class="mb-3">
+                            <!--label for="filter-methods" class="col-form-label">Methods:</label-->
+                            <!--textarea class="form-control" id="message-text"></textarea-->
+                            <div class="form-check form-check-inline">
+                              <input class="form-check-input" type="checkbox" id="post-{{$i}}" value="POST" {{if $filterURL.POST}}checked{{end}}>
+                              <label class="form-check-label" for="post-{{$i}}">POST</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                              <input class="form-check-input" type="checkbox" id="get-{{$i}}" value="GET" {{if $filterURL.GET}}checked{{end}}>
+                              <label class="form-check-label" for="get-{{$i}}">GET</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                              <input class="form-check-input" type="checkbox" id="put-{{$i}}" value="PUT" {{if $filterURL.PUT}}checked{{end}}>
+                              <label class="form-check-label" for="put-{{$i}}">PUT</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                              <input class="form-check-input" type="checkbox" id="patch-{{$i}}" value="PATCH" {{if $filterURL.PATCH}}checked{{end}}>
+                              <label class="form-check-label" for="patch-{{$i}}">PATCH</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                              <input class="form-check-input" type="checkbox" id="options-{{$i}}" value="OPTIONS" {{if $filterURL.OPTIONS}}checked{{end}}>
+                              <label class="form-check-label" for="options-{{$i}}">OPTIONS</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                              <input class="form-check-input" type="checkbox" id="del-{{$i}}" value="DELETE" {{if $filterURL.DELETE}}checked{{end}}>
+                              <label class="form-check-label" for="del-{{$i}}">DELETE</label>
+                            </div>
+                          </div>
+                          <hr/>
+                          <div class="mb-3">
+                            <!--label for="filter-methods" class="col-form-label">Methods:</label-->
+                            <!--textarea class="form-control" id="message-text"></textarea-->
+                            <div class="form-check form-check-inline">
+                              <input class="form-check-input" type="checkbox" id="request-{{$i}}" value="REQUEST" {{if $filterURL.REQUEST}}checked{{end}}>
+                              <label class="form-check-label" for="request-{{$i}}">Filter Request Messages</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                              <input class="form-check-input" type="checkbox" id="response-{{$i}}" value="RESPONSE" {{if $filterURL.RESPONSE}}checked{{end}}>
+                              <label class="form-check-label" for="response-{{$i}}">Filter Response Messages</label>
+                            </div>
+                          </div>
+                        </form>
+                        <button type="button" class="btn btn-danger" data-bs-dismiss="modal" onclick="removeFilterURL(this)">Remove</button>
+
+                      </div>
+                    </div>
+                  </div>
+                {{end}}
+              </div>
+            </div>
+
+
+          <div class="modal fade" id="urlFilterModal" tabindex="-1" aria-labelledby="urlFilterModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <!--div class="modal-header">
+                  <h5 class="modal-title" id="exampleModalLabel">New message</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div-->
+                <div class="modal-body">
+                  <form>
+                    <div class="mb-3">
+                      <label for="filter-url" class="col-form-label">URL:</label>
+                      <input type="text" class="form-control" id="filter-url">
+                    </div>
+                    <div class="mb-3">
+                      <!--label for="filter-methods" class="col-form-label">Methods:</label-->
+                      <!--textarea class="form-control" id="message-text"></textarea-->
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="post" value="POST">
+                        <label class="form-check-label" for="post">POST</label>
+                      </div>
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="get" value="GET">
+                        <label class="form-check-label" for="get">GET</label>
+                      </div>
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="put" value="PUT">
+                        <label class="form-check-label" for="put">PUT</label>
+                      </div>
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="patch" value="PATCH">
+                        <label class="form-check-label" for="patch">PATCH</label>
+                      </div>
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="options" value="OPTIONS">
+                        <label class="form-check-label" for="options">OPTIONS</label>
+                      </div>
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="del" value="DELETE">
+                        <label class="form-check-label" for="del">DELETE</label>
+                      </div>
+                    </div>
+                    <hr/>
+                    <div class="mb-3">
+                      <!--label for="filter-methods" class="col-form-label">Methods:</label-->
+                      <!--textarea class="form-control" id="message-text"></textarea-->
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="request" value="REQUEST">
+                        <label class="form-check-label" for="request">Filter Request Messages</label>
+                      </div>
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="response" value="RESPONSE">
+                        <label class="form-check-label" for="response">Filter Response Messages</label>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                  <!--button type="button" class="btn btn-danger" data-bs-dismiss="modal">Remove</button-->
+                  <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="filterURL()">Save</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+
+        </div>
+      </div>
+
+      <p><input type="hidden" id="proxyUuid" name="proxyUuid" value=""></p>
+      <p><input type="submit" id="proxySubmitMsg" value="Send" class="btn btn-outline-success" onclick="submitProxyMessage();return false"/></p>
+    </fieldset>
+  </form>
+
+ 
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/js-base64@3.7.7/base64.min.js"></script>
+
+<script type="text/javascript">
+  intiializeWS('proxy');
+
+  document.querySelectorAll(".form-check-input").forEach( (e) => {
+    /*if (e.id.includes('-')) {
+      e.addEventListener("change", (event) => {
+        //console.log(event)
+        //console.log(event.target.id)
+        filterURL(event.target.id);
+      });
+    }*/
+    addListener(e)
+  });
+
+  /*
+  var urlFilterModal = document.getElementById('urlFilterModal')
+  urlFilterModal.addEventListener('show.bs.modal', function (event) {
+    // Button that triggered the modal
+    var button = event.relatedTarget
+    // Extract info from data-bs-* attributes
+    //var recipient = button.getAttribute('data-bs-whatever')
+    // If necessary, you could initiate an AJAX request here
+    // and then do the updating in a callback.
+    //
+    // Update the modal's content.
+    //var modalTitle = urlFilterModal.querySelector('.modal-title')
+    //var modalBodyInput = urlFilterModal.querySelector('.modal-body input')
+
+    //modalTitle.textContent = 'New message to ' + recipient
+    //modalBodyInput.value = recipient
+  })
+  */
+
+  function addListener(e) {
+    if (e.id.includes('-')) {
+      e.addEventListener("change", (event) => {
+        //console.log(event)
+        //console.log(event.target.id)
+        filterURL(event.target.id);
+      });
+    }
+  }
+
+  function filterURL(instance) {
+    /*
+        POST to /proxyfilter/toggle
+         json
+    */
+    var url;
+    if (typeof instance === 'undefined' || instance === null || instance === '') {
+      instance = '';
+      url = document.getElementById('filter-url'+instance).value;
+      if (url === '') {
+        return;
+      }
+      if (!url.startsWith('/')) {
+        url = '/' + url;
+      }
+    } else {
+      instance = '-' + instance.split('-')[1];
+      url = document.getElementById('flush-heading'+instance).children[0].innerText;
+    }
+    const post = document.getElementById('post'+instance).checked
+    const put = document.getElementById('put'+instance).checked
+    const patch = document.getElementById('patch'+instance).checked
+    const get = document.getElementById('get'+instance).checked
+    const del = document.getElementById('del'+instance).checked
+    const options = document.getElementById('options'+instance).checked
+    const request = document.getElementById('request'+instance).checked
+    const response = document.getElementById('response'+instance).checked
+    const msg = JSON.stringify({url, post, put, patch, get, del, options, request, response});
+    sendPost(location.origin + "/proxyfilter/toggle", msg, () => { 
+      console.log('posted: ' + msg);
+      if (instance === '') {
+        document.getElementById('filter-url'+instance).value = '';
+        document.getElementById('post'+instance).checked = false;
+        document.getElementById('put'+instance).checked = false;
+        document.getElementById('patch'+instance).checked = false;
+        document.getElementById('get'+instance).checked = false;
+        document.getElementById('del'+instance).checked = false;
+        document.getElementById('options'+instance).checked = false;
+        document.getElementById('request'+instance).checked = false;
+        document.getElementById('response'+instance).checked = false;
+        const id = Date.now();
+        var div = document.createElement('DIV');
+        div.innerHTML = `
+          <div class="accordion-item">
+                      <h2 class="accordion-header" id="flush-heading-${id}">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#flush-collapse-${id}" aria-expanded="false" aria-controls="flush-collapse-${id}">
+                          ${url}
+                        </button>
+                      </h2>
+                      <div id="flush-collapse-${id}" class="accordion-collapse collapse" aria-labelledby="flush-heading-${id}" data-bs-parent="#accordionFilterUrls">
+                        <div class="accordion-body">
+                          <form>
+                            <div class="mb-3">
+                              <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="post-${id}" value="POST" ${post ? 'checked' : ''}>
+                                <label class="form-check-label" for="post-${id}">POST</label>
+                              </div>
+                              <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="get-${id}" value="GET" ${get ? 'checked' : ''}>
+                                <label class="form-check-label" for="get-${id}">GET</label>
+                              </div>
+                              <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="put-${id}" value="PUT" ${put ? 'checked' : ''}>
+                                <label class="form-check-label" for="put-${id}">PUT</label>
+                              </div>
+                              <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="patch-${id}" value="PATCH" ${patch ? 'checked' : ''}>
+                                <label class="form-check-label" for="patch-${id}">PATCH</label>
+                              </div>
+                              <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="options-${id}" value="OPTIONS" ${options ? 'checked' : ''}>
+                                <label class="form-check-label" for="options-${id}">OPTIONS</label>
+                              </div>
+                              <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="del-${id}" value="DELETE" ${del ? 'checked' : ''}>
+                                <label class="form-check-label" for="del-${id}">DELETE</label>
+                              </div>
+                            </div>
+                            <hr/>
+                            <div class="mb-3">
+                              <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="request-${id}" value="REQUEST" ${request ? 'checked' : ''}>
+                                <label class="form-check-label" for="request-${id}">Filter Request Messages</label>
+                              </div>
+                              <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="response-${id}" value="RESPONSE" ${response ? 'checked' : ''}>
+                                <label class="form-check-label" for="response-${id}">Filter Response Messages</label>
+                              </div>
+                            </div>
+                          </form>
+                          <button type="button" class="btn btn-danger" data-bs-dismiss="modal" onclick="removeFilterURL(this)">Remove</button>
+                        </div>
+                      </div>
+                    </div>
+        `;
+        //var urls = document.getElementById('accordionFilterUrls');
+        document.getElementById('accordionFilterUrls').appendChild(div);
+        addListener(document.getElementById(`post-${id}`));
+        addListener(document.getElementById(`put-${id}`));
+        addListener(document.getElementById(`patch-${id}`));
+        addListener(document.getElementById(`del-${id}`));
+        addListener(document.getElementById(`get-${id}`));
+        addListener(document.getElementById(`options-${id}`));
+        addListener(document.getElementById(`request-${id}`));
+        addListener(document.getElementById(`response-${id}`));
+      }
+    });
+  }
+
+  function removeFilterURL(element) {
+    const el = element.parentElement.parentElement.parentElement;
+    sendDelete(location.origin + "/proxyfilter/toggle?path=" + el.children[0].children[0].innerText, 
+      () => {
+        el.remove();
+      }, () => {
+        // no Op for error
+      }
+    );
+  }
+
+</script>
+
+{{template "footer"}}

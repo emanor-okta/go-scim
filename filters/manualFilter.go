@@ -1,11 +1,11 @@
 package filters
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/gorilla/websocket"
 
@@ -151,6 +151,66 @@ func (f ManualFilter) GroupsIdPatchRequest(ops *v2.PatchOp, path string) {
 /*
  * ProxyFilter Implementations
  */
+// func (f ManualFilter) FilterRequest(h http.Header, b []byte, path, contentType string) []byte {
+func (f ManualFilter) FilterRequest(h map[string][]string, b []byte, path, contentType string) (map[string][]string, []byte) {
+	m := map[string]interface{}{}
+	m["httpHeaders"] = h
+	m["base64Content"] = base64.StdEncoding.EncodeToString(b)
+	m["contentType"] = contentType
+	doc, err := json.Marshal(m)
+	if err != nil {
+		log.Printf("FilterRequest %s Error: %v\n", path, err)
+		return h, b
+	}
+	returnBytes := f.sendByteArrayRequest("ManualFilter.FilterRequest", doc, path)
+	// delete(m, "base64Content")
+	// delete(m, "httpHeaders")
+	// delete(m, "contentType")
+	err = json.Unmarshal(returnBytes, &m)
+	if err != nil {
+		log.Printf("FilterRequest %s Response Error: %v\n", path, err)
+		return h, b
+	}
+	decoded, err := base64.StdEncoding.DecodeString(m["base64Content"].(string))
+	if err != nil {
+		log.Printf("FilterRequest %s decode error: %v\n", path, err)
+		return h, b
+	}
+
+	return m["httpHeaders"].(map[string][]string), decoded
+
+	// WAS Working, above will now also send headers
+	// if contentType != "json" {
+	// 	m := map[string]interface{}{}
+	// 	m["base64Content"] = base64.StdEncoding.EncodeToString(b)
+	// 	m["httpHeaders"] = h
+	// 	doc, err := json.Marshal(m)
+	// 	if err != nil {
+	// 		log.Printf("FilterRequest %s Error: %v\n", path, err)
+	// 		return b
+	// 	}
+	// 	returnBytes := f.sendByteArrayRequest("ManualFilter.FilterRequest", doc, path)
+	// 	delete(m, "base64Content")
+	// 	err = json.Unmarshal(returnBytes, &m)
+	// 	if err != nil {
+	// 		log.Printf("FilterRequest %s Response Error: %v\n", path, err)
+	// 		return b
+	// 	}
+	// 	decoded, err := base64.StdEncoding.DecodeString(m["base64Content"].(string))
+	// 	if err != nil {
+	// 		log.Printf("FilterRequest %s decode error: %v\n", path, err)
+	// 		return b
+	// 	}
+	// 	return decoded
+	// } else {
+	// 	return f.sendByteArrayRequest("ManualFilter.FilterRequest", b, path)
+	// }
+}
+
+func (f ManualFilter) FilterResponse(http.Header, []*http.Cookie, []byte, string) []byte {
+	return nil
+}
+
 func (f ManualFilter) GetRequest(h http.Header, b []byte, path string) []byte {
 	return nil
 }
@@ -160,33 +220,36 @@ func (f ManualFilter) GetResponse(h http.Header, b []byte, path string) []byte {
 }
 
 func (f ManualFilter) PostRequest(h http.Header, b []byte, path string) []byte {
+
 	return nil
 }
 
 func (f ManualFilter) PostResponse(h http.Header, c []*http.Cookie, b []byte, path string) []byte {
 	fmt.Printf(">> FILTER %s <<\n", path)
-	if strings.Contains(path, "/token") {
-		//values := h.Get("Set-Cookie")
-		h.Del("set-cookie")
-		for _, v := range c {
-			fmt.Printf("  Set-Cookie -> %+v\n", v)
-			if v.Name == "idx" {
-				fmt.Printf("Its idx...")
-				if v.SameSite != http.SameSiteNoneMode {
-					fmt.Println("SameSite=none not set, setting...")
-					v.SameSite = http.SameSiteStrictMode
-					fmt.Printf("  Set-Cookie -> %+v\n", v)
-					fmt.Printf("%+v\n", v.Unparsed)
-					// need to update set-cookie header ?
-					h.Add("Set-Cookie", fmt.Sprintf("%s;SameSite=None", v.Raw))
-				} else {
-					h.Add("Set-Cookie", v.Raw)
-				}
+	// if strings.Contains(path, "/token") {
+	//values := h.Get("Set-Cookie")
+	h.Del("set-cookie")
+	for _, v := range c {
+		fmt.Printf("  Set-Cookie -> %+v\n", v)
+		if v.Name == "idx" || v.Name == "sid" {
+			fmt.Printf("Its idx...")
+			h.Add("Set-Cookie", fmt.Sprintf("%s; Partitioned;", v.Raw))
+			if v.SameSite != http.SameSiteNoneMode {
+				fmt.Println("SameSite=none not set, setting...")
+				// v.SameSite = http.SameSiteStrictMode
+				// fmt.Printf("  Set-Cookie -> %+v\n", v)
+				// fmt.Printf("%+v\n", v.Unparsed)
+				// // need to update set-cookie header ?
+				// h.Add("Set-Cookie", fmt.Sprintf("%s;SameSite=None", v.Raw))
 			} else {
 				h.Add("Set-Cookie", v.Raw)
 			}
+		} else {
+			h.Add("Set-Cookie", v.Raw)
 		}
 	}
+
+	// }
 	return nil
 }
 

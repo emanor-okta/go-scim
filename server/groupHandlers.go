@@ -11,13 +11,13 @@ import (
 	"github.com/emanor-okta/go-scim/utils"
 )
 
-// {GET/POST} /scim/v2/Groups
+// {GET/POST} /goscim/scim/v2/Groups
 func handleGroups(res http.ResponseWriter, req *http.Request) {
 	// if didRedirect(&res, req) {
 	// 	return
 	// }
 	res.Header().Add("content-type", content_type)
-	path := "/scim/v2/Groups"
+	path := "/goscim/scim/v2/Groups"
 
 	if req.Method == http.MethodGet {
 		// GET
@@ -110,7 +110,7 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// {GET/PUT/PATCH/DELETE} /scim/v2/Groups/<id>
+// {GET/PUT/PATCH/DELETE} /goscim/scim/v2/Groups/<id>
 func handleGroup(res http.ResponseWriter, req *http.Request) {
 	// if didRedirect(&res, req) {
 	// 	return
@@ -118,19 +118,19 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 	res.Header().Add("content-type", content_type)
 
 	parts := strings.Split(req.URL.Path[1:], "/")
-	if len(parts) != 4 || parts[3] == "" {
+	if len(parts) != 5 || parts[4] == "" {
 		res.WriteHeader(http.StatusNotFound)
 		res.Write(nil)
 		fmt.Printf("Not Found: %v, %v\n", len(parts), parts)
 		return
 	}
-	uuid := parts[3]
-	path := fmt.Sprintf("/scim/v2/Groups/%s", uuid)
+	uuid := parts[4]
+	path := fmt.Sprintf("/goscim/scim/v2/Groups/%s", uuid)
 
 	if req.Method == http.MethodDelete {
 		// DELETE
 		if err := utils.DelGroup(uuid); err != nil {
-			log.Printf("Error for DELETE /scim/v2/Groups/%v, err: %v\n\n", uuid, err)
+			log.Printf("Error for DELETE /goscim/scim/v2/Groups/%v, err: %v\n\n", uuid, err)
 			handleErrorResponse(&res, err.Error(), http.StatusInternalServerError)
 			return
 		}

@@ -57,6 +57,7 @@ var appClientID = "0oa1qcts70mVXVA6Y1d7";
       authParams: {
         issuer: baseOktaURL + '/oauth2/default',
         //display: 'popup',
+        maxClockSkew: 3600,
         scopes: ['openid', 'profile', 'email', 'offline_access', 'device_sso'] //'okta.myAccount.profile.read', 'okta.myAccount.password.manage'] //, 'device_sso'], //, 'okta.myAccount.email.manage', 'okta.myAccount.email.read', 'okta.myAccount.phone.manage', 'okta.myAccount.phone.read', 'okta.users.read']
       },
       
@@ -195,10 +196,10 @@ var appClientID = "0oa1qcts70mVXVA6Y1d7";
   */
 
   
-//showSignIn();
+showSignIn();
       
   function showSignIn(url, mode, redirect) {
-    /*
+    
     oktaSignIn.showSignInToGetTokens({
       el: '#okta-login-container'
     }).then(function(tokens) {
@@ -209,8 +210,8 @@ var appClientID = "0oa1qcts70mVXVA6Y1d7";
     }).catch(function(error) {
       console.log(error);
     });
-    */
-
+    
+/*
       fetch(url, {
       //fetch('https://gw.oktamanor.net/oauth2/default/v1/authorize', {
         method: 'GET', // *GET, POST, PUT, DELETE, etc.
@@ -243,7 +244,7 @@ var appClientID = "0oa1qcts70mVXVA6Y1d7";
         console.log('Fetch Error:');
         console.log(err);
       });    
-   
+   */
 
 
 console.log('In showSignin()');

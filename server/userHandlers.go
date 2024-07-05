@@ -1,6 +1,7 @@
 package server
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -19,13 +20,13 @@ const (
  * SCIM Handlers
  */
 
-// {GET/POST} /scim/v2/Users
+// {GET/POST} /goscim/scim/v2/Users
 func handleUsers(res http.ResponseWriter, req *http.Request) {
 	// if didRedirect(&res, req) {
 	// 	return
 	// }
 	res.Header().Add("content-type", content_type)
-	path := "/scim/v2/Users"
+	path := "/goscim/scim/v2/Users"
 
 	if req.Method == http.MethodGet {
 		// GET
@@ -36,6 +37,13 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 		}
 
 		if q.filter.userName != "" {
+			// TEST
+			if strings.Contains(q.filter.userName, "igor") {
+				// return unauthorized
+				res.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			// END TEST
 			// ?filter=username eq <username>
 			path = fmt.Sprintf("%s?filter=username eq %s&startIndex=%v&count=%v", path, q.filter.userName, q.startIndex, q.count)
 			user, err := utils.GetUserByFilter(q.filter.userName)
@@ -118,7 +126,7 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// {GET/PUT/PATCH/DELETE} /scim/v2/Users/<id>
+// {GET/PUT/PATCH/DELETE} /goscim/scim/v2/Users/<id>
 func handleUser(res http.ResponseWriter, req *http.Request) {
 	// if didRedirect(&res, req) {
 	// 	return
@@ -126,14 +134,14 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 	res.Header().Add("content-type", content_type)
 
 	parts := strings.Split(req.URL.Path[1:], "/")
-	if len(parts) != 4 || parts[3] == "" {
+	if len(parts) != 5 || parts[4] == "" {
 		res.WriteHeader(http.StatusNotFound)
 		res.Write(nil)
 		fmt.Printf("Not Found: %v, %v\n", len(parts), parts)
 		return
 	}
-	uuid := parts[3]
-	path := fmt.Sprintf("/scim/v2/Users/%s", uuid)
+	uuid := parts[4]
+	path := fmt.Sprintf("/goscim/scim/v2/Users/%s", uuid)
 
 	if req.Method == http.MethodDelete {
 		// DELETE (not used by Okta)
@@ -142,7 +150,7 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 				handleErrorForKeyLookup(&res, err, uuid)
 				return
 			} else {
-				log.Printf("Error for DELETE /scim/v2/User/%v, err: %v\n\n", uuid, err)
+				log.Printf("Error for DELETE /goscim/scim/v2/User/%v, err: %v\n\n", uuid, err)
 			}
 		}
 
@@ -162,6 +170,14 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 
 		res.WriteHeader(http.StatusOK)
 		res.Write([]byte(user[0].(string)))
+
+		// TEST - encoding as gzip
+		// var m map[string]interface{}
+		// fmt.Println(user[0].(string))
+		// err = json.Unmarshal([]byte(user[0].(string)), &m)
+		// fmt.Println(err)
+		// fmt.Printf("%+v\n", m)
+		// writeCompressedResponse(res, user[0].(string))
 	} else {
 		b, err := getBody(req)
 		if err != nil {
@@ -196,7 +212,7 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 
 			res.WriteHeader(http.StatusOK)
 			if _, err = res.Write(b); err != nil {
-				log.Printf("Error replying for PUT /scim/v2/User/%v, err: %v\n\n", uuid, err)
+				log.Printf("Error replying for PUT /goscim/scim/v2/User/%v, err: %v\n\n", uuid, err)
 			}
 
 			//res.Header().Add("Retry-After", "1")
@@ -205,7 +221,7 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 			// PATCH
 			var ops v2.PatchOp
 			if err := json.Unmarshal(b, &ops); err != nil {
-				log.Printf("Error Unmarshalling JSON for PATCH /scim/v2/User/%v, err: %v\n\n", uuid, err)
+				log.Printf("Error Unmarshalling JSON for PATCH /goscim/scim/v2/User/%v, err: %v\n\n", uuid, err)
 				handleErrorResponse(&res, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -228,7 +244,7 @@ func handleUser(res http.ResponseWriter, req *http.Request) {
 				if err.Error() == NOT_FOUND {
 					handleErrorForKeyLookup(&res, err, uuid)
 				} else {
-					log.Printf("Error for PATCH /scim/v2/User/%v, err: %v\n\n", uuid, err)
+					log.Printf("Error for PATCH /goscim/scim/v2/User/%v, err: %v\n\n", uuid, err)
 					handleErrorResponse(&res, err.Error(), http.StatusInternalServerError)
 				}
 				return
@@ -263,4 +279,14 @@ func embedUsersGroups(docs interface{}) []interface{} {
 		users = append(users, user)
 	}
 	return users
+}
+
+func writeCompressedResponse(w http.ResponseWriter, body any) {
+	w.Header().Set("Content-Encoding", "gzip")
+	// res.Header().Add("content-type", content_type)
+	// w.Header().Del("content-type")
+
+	gw := gzip.NewWriter(w)
+	defer gw.Close()
+	json.NewEncoder(gw).Encode(body)
 }

@@ -91,6 +91,25 @@ type MessagessTmpl struct {
 	ProxySwitchEnabled bool
 }
 
+// type ProxyFilterURL struct {
+// 	URL string
+// 	REQUEST,
+// 	RESPONSE,
+// 	POST,
+// 	PUT,
+// 	GET,
+// 	PATCH,
+// 	DELETE,
+// 	OPTIONS bool
+// }
+
+type ProxyFilterURLsTmpl struct {
+	// RequestURLs  []ProxyFilterURL
+	// ResponseURLs []ProxyFilterURL
+	URLs []utils.ProxyFilterURL
+	// URLs []ProxyFilterURL
+}
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -111,7 +130,9 @@ func StartWebServer(c *utils.Configuration) {
 	http.HandleFunc("/groups/delete", handleDeleteGroup)
 	http.HandleFunc("/filters/ws", handleWebSocketUpgrade)
 	http.HandleFunc("/filters", handleFilters)
+	http.HandleFunc("/proxyfilter", handleProxyFilters)
 	http.HandleFunc("/filters/toggle", handleToggleFilter)
+	http.HandleFunc("/proxyfilter/toggle", handleProxyToggleFilter)
 	// http.HandleFunc("/config", handleConfig)
 	http.HandleFunc("/js/ws.js", handleJavascript)
 	http.HandleFunc("/js/ui.js", handleJavascript)
@@ -248,18 +269,90 @@ func handleFilters(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func handleProxyFilters(res http.ResponseWriter, req *http.Request) {
+	fmt.Println("Returning Proxy Filters")
+	filterMutex.Lock()
+	manualFilter = filters.ManualFilter{Config: config, WsConn: nil, ReqMap: make(map[string]chan interface{}, 0)}
+	*config.ReqFilter = &manualFilter
+	filterId++
+	filterMutex.Unlock()
+
+	Tmpl := ProxyFilterURLsTmpl{}
+	//Tmpl.URLs = []ProxyFilterURL{}
+	urls := []utils.ProxyFilterURL{}
+	for _, v := range config.ProxyMessageFilter.FilterURLs {
+		urls = append(urls, v)
+	}
+	// Tmpl.URLs = config.ProxyMessageFilter.FilterURLs
+	Tmpl.URLs = urls
+
+	// Tmpl.ResponseURLs = []ProxyFilterURL{}
+	// for _, v := range config.WebMessageFilter.
+	fmt.Println(config.ProxyMessageFilter.FilterMessages)
+	// if config.ProxyMessageFilter.FilterMessages {
+	// 	for key, value := range config.ProxyMessageFilter.FilterURLs {
+	// 		Tmpl.URLs = append(Tmpl.URLs, getProxyFilterURL(key, value))
+	// 	}
+	// 	// for key, value := range config.ProxyMessageFilter.ResponseMessages {
+	// 	// 	Tmpl.ResponseURLs = append(Tmpl.ResponseURLs, getProxyFilterURL(key, value))
+	// 	// }
+	// }
+	fmt.Printf("%+v\n", Tmpl)
+	err := tpl.ExecuteTemplate(res, "proxyfilter.gohtml", Tmpl)
+	if err != nil {
+		fmt.Printf("%+v\n", err)
+	}
+}
+
+// func getProxyFilterURL(filterUrl string, methods map[string]bool) ProxyFilterURL {
+// 	proxyFilterURL := ProxyFilterURL{URL: filterUrl}
+// 	v, ok := methods["GET"]
+// 	if ok {
+// 		proxyFilterURL.GET = v
+// 	}
+// 	v, ok = methods["POST"]
+// 	if ok {
+// 		proxyFilterURL.POST = v
+// 	}
+// 	v, ok = methods["PUT"]
+// 	if ok {
+// 		proxyFilterURL.PUT = v
+// 	}
+// 	v, ok = methods["PATCH"]
+// 	if ok {
+// 		proxyFilterURL.PATCH = v
+// 	}
+// 	v, ok = methods["DELETE"]
+// 	if ok {
+// 		proxyFilterURL.DELETE = v
+// 	}
+// 	v, ok = methods["OPTIONS"]
+// 	if ok {
+// 		proxyFilterURL.OPTIONS = v
+// 	}
+// 	v, ok = methods["REQUEST"]
+// 	if ok {
+// 		proxyFilterURL.REQUEST = v
+// 	}
+// 	v, ok = methods["RESPONSE"]
+// 	if ok {
+// 		proxyFilterURL.RESPONSE = v
+// 	}
+// 	return proxyFilterURL
+// }
+
 // func handleConfig(res http.ResponseWriter, req *http.Request) {
 // 	fmt.Println("Returning Config")
 // 	tpl.ExecuteTemplate(res, "config.gohtml", nil)
 // }
 
 func handleUpdateUser(res http.ResponseWriter, req *http.Request) {
-	handleUpdate(res, req, fmt.Sprintf("%s%s/scim/v2/Users", getScheme(req.TLS, req.Host), req.Host))
+	handleUpdate(res, req, fmt.Sprintf("%s%s/goscim/scim/v2/Users", getScheme(req.TLS, req.Host), req.Host))
 }
 
 func handleDeleteUser(res http.ResponseWriter, req *http.Request) {
 	id := req.URL.Query().Get("id")
-	err := sendDeleteToScim(fmt.Sprintf("%s%s/scim/v2/Users/%s", getScheme(req.TLS, req.Host), req.Host, id))
+	err := sendDeleteToScim(fmt.Sprintf("%s%s/goscim/scim/v2/Users/%s", getScheme(req.TLS, req.Host), req.Host, id))
 	if err != nil {
 		log.Printf("handleDeleteUser() error: %v\n", err)
 		res.WriteHeader(http.StatusInternalServerError)
@@ -271,7 +364,7 @@ func handleDeleteUser(res http.ResponseWriter, req *http.Request) {
 }
 
 func handleUpdateGroup(res http.ResponseWriter, req *http.Request) {
-	handleUpdate(res, req, fmt.Sprintf("%s%s/scim/v2/Groups", getScheme(req.TLS, req.Host), req.Host))
+	handleUpdate(res, req, fmt.Sprintf("%s%s/goscim/scim/v2/Groups", getScheme(req.TLS, req.Host), req.Host))
 }
 
 func handleUpdate(res http.ResponseWriter, req *http.Request, url string) {
@@ -303,7 +396,7 @@ func handleUpdate(res http.ResponseWriter, req *http.Request, url string) {
 
 func handleDeleteGroup(res http.ResponseWriter, req *http.Request) {
 	id := req.URL.Query().Get("id")
-	err := sendDeleteToScim(fmt.Sprintf("%s%s/scim/v2/Groups/%s", getScheme(req.TLS, req.Host), req.Host, id))
+	err := sendDeleteToScim(fmt.Sprintf("%s%s/goscim/scim/v2/Groups/%s", getScheme(req.TLS, req.Host), req.Host, id))
 	if err != nil {
 		log.Printf("handleDeleteGroup() error: %v\n", err)
 		res.WriteHeader(http.StatusInternalServerError)
@@ -423,6 +516,30 @@ func handleToggleFilter(res http.ResponseWriter, req *http.Request) {
 	res.Write(nil)
 }
 
+func handleProxyToggleFilter(res http.ResponseWriter, req *http.Request) {
+	log.Printf("handleProxyToggleFilter, request: %s %s\n", req.Method, req.RequestURI)
+	if req.Method == http.MethodPost {
+		b, err := getBody(req)
+		if err != nil {
+			log.Printf("handleProxyToggleFilter: Error getting POST body: %v\n", err)
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		var msg utils.ProxyFilterURL
+		if err := json.Unmarshal(b, &msg); err != nil {
+			log.Printf("handleProxyToggleFilter: Error decoding Json Data: %v\n", err)
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		config.ProxyMessageFilter.FilterURLs[msg.URL] = msg
+		fmt.Printf("%+v\n", config.ProxyMessageFilter.FilterURLs)
+		res.WriteHeader(http.StatusOK)
+	} else if req.Method == http.MethodDelete {
+		path := req.URL.Query().Get("path")
+		delete(config.ProxyMessageFilter.FilterURLs, path)
+	}
+}
+
 func wsReader() {
 	filterMutex.Lock()
 	filterId_ := filterId
@@ -450,8 +567,9 @@ func wsReader() {
 			continue
 		}
 
-		// fmt.Printf("message: %+v\n", m)
+		fmt.Printf("message: %+v\n", m)
 		uuid, ok := m.(map[string]interface{})["uuid"]
+		// fmt.Printf("uuid: %v, v: %v\n", uuid.(string), manualFilter.ReqMap[uuid.(string)])
 		if ok {
 			ch := manualFilter.ReqMap[uuid.(string)]
 			if ch != nil {
@@ -463,7 +581,7 @@ func wsReader() {
 
 func getUsers(start, count string, req *http.Request) UsersTmpl {
 	ut := UsersTmpl{}
-	lr, err := getListResponseResource(fmt.Sprintf("%s%s/scim/v2/Users?startIndex=%s&count=%s", getScheme(req.TLS, req.Host), req.Host, start, count))
+	lr, err := getListResponseResource(fmt.Sprintf("%s%s/goscim/scim/v2/Users?startIndex=%s&count=%s", getScheme(req.TLS, req.Host), req.Host, start, count))
 	if err != nil {
 		ut.Error = err
 		return ut
@@ -481,7 +599,7 @@ func getUsers(start, count string, req *http.Request) UsersTmpl {
 
 func getGroups(start, count string, req *http.Request) GroupsTmpl {
 	gt := GroupsTmpl{}
-	lr, err := getListResponseResource(fmt.Sprintf("%s%s/scim/v2/Groups?startIndex=%s&count=%s", getScheme(req.TLS, req.Host), req.Host, start, count))
+	lr, err := getListResponseResource(fmt.Sprintf("%s%s/goscim/scim/v2/Groups?startIndex=%s&count=%s", getScheme(req.TLS, req.Host), req.Host, start, count))
 	if err != nil {
 		gt.Error = err
 		return gt
