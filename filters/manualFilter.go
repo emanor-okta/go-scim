@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 
 	"github.com/gorilla/websocket"
 
@@ -154,6 +153,7 @@ func (f ManualFilter) GroupsIdPatchRequest(ops *v2.PatchOp, path string) {
 // func (f ManualFilter) FilterRequest(h http.Header, b []byte, path, contentType string) []byte {
 func (f ManualFilter) FilterRequest(h map[string][]string, b []byte, path, contentType string) (map[string][]string, []byte) {
 	m := map[string]interface{}{}
+	m["httpHeaders"] = map[string][]string{}
 	m["httpHeaders"] = h
 	m["base64Content"] = base64.StdEncoding.EncodeToString(b)
 	m["contentType"] = contentType
@@ -176,37 +176,14 @@ func (f ManualFilter) FilterRequest(h map[string][]string, b []byte, path, conte
 		log.Printf("FilterRequest %s decode error: %v\n", path, err)
 		return h, b
 	}
+	// fmt.Println("Differences:")
+	// fmt.Printf("%+v\n", m["httpHeaders"])
+	// fmt.Printf("%+v\n", h)
 
-	return m["httpHeaders"].(map[string][]string), decoded
-
-	// WAS Working, above will now also send headers
-	// if contentType != "json" {
-	// 	m := map[string]interface{}{}
-	// 	m["base64Content"] = base64.StdEncoding.EncodeToString(b)
-	// 	m["httpHeaders"] = h
-	// 	doc, err := json.Marshal(m)
-	// 	if err != nil {
-	// 		log.Printf("FilterRequest %s Error: %v\n", path, err)
-	// 		return b
-	// 	}
-	// 	returnBytes := f.sendByteArrayRequest("ManualFilter.FilterRequest", doc, path)
-	// 	delete(m, "base64Content")
-	// 	err = json.Unmarshal(returnBytes, &m)
-	// 	if err != nil {
-	// 		log.Printf("FilterRequest %s Response Error: %v\n", path, err)
-	// 		return b
-	// 	}
-	// 	decoded, err := base64.StdEncoding.DecodeString(m["base64Content"].(string))
-	// 	if err != nil {
-	// 		log.Printf("FilterRequest %s decode error: %v\n", path, err)
-	// 		return b
-	// 	}
-	// 	return decoded
-	// } else {
-	// 	return f.sendByteArrayRequest("ManualFilter.FilterRequest", b, path)
-	// }
+	return utils.ConvertHeaderMap(m["httpHeaders"]), decoded
 }
 
+/*
 func (f ManualFilter) FilterResponse(http.Header, []*http.Cookie, []byte, string) []byte {
 	return nil
 }
@@ -268,6 +245,7 @@ func (f ManualFilter) OptionsRequest(h http.Header, b []byte, path string) []byt
 func (f ManualFilter) OptionsResponse(h http.Header, b []byte, path string) []byte {
 	return nil
 }
+*/
 
 /*
  * Helpers

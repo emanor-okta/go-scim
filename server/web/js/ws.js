@@ -93,9 +93,9 @@ function displayNextProxyMessage() {
         document.getElementById('proxyMessageArea').value = Base64.decode(resp.message.base64Content);
         needsBase64 = true;
     } else {
-        document.getElementById('proxyMessageArea').value = JSON.stringify(resp.message, undefined, 4);
+        //document.getElementById('proxyMessageArea').value = JSON.stringify(resp.message, undefined, 4);
     }
-
+    document.getElementById('proxyMessageHeaders').value = JSON.stringify(resp.message.httpHeaders, undefined, 4);
     // document.getElementById('proxyMessageArea').value = resp.message;
     // document.getElementById('proxyMessageArea').value = JSON.stringify(resp.message, undefined, 4);
     document.getElementById('proxyUuid').value = resp.uuid;
@@ -160,7 +160,7 @@ function submitMessage() {
 }
 
 function submitProxyMessage() {
-    var str = parseMessage(document.getElementById('proxySubmitMsg'), document.getElementById('proxyMessageArea'), document.getElementById('proxyUuid'));
+    var str = parseMessage(document.getElementById('proxySubmitMsg'), document.getElementById('proxyMessageArea'), document.getElementById('proxyUuid'), document.getElementById('proxyMessageHeaders'));
     if (!str) {
         return;
     }
@@ -172,7 +172,7 @@ function submitProxyMessage() {
     }
 }
 
-function parseMessage(submitElement, messageElement, uuidElement) {
+function parseMessage(submitElement, messageElement, uuidElement, httpHeaderElement) {
     submitElement.disabled = true;
     var uuid = uuidElement.value;
     console.log('uuid: ' + uuid)
@@ -183,8 +183,19 @@ function parseMessage(submitElement, messageElement, uuidElement) {
     console.log(msg)
     var str;
     try {
-        var obj = JSON.parse(msg);
+        var obj; // = JSON.parse(msg);
+        if (msg !== undefined && msg !== '') {
+            obj = JSON.parse(msg);
+        } else {
+            obj = JSON.parse('{}');
+        }
         obj["uuid"] = uuid;
+        
+        if (httpHeaderElement !== undefined && httpHeaderElement.value !== undefined && httpHeaderElement.value !== '') {
+            const headers = JSON.parse(httpHeaderElement.value);
+            obj['httpHeaders'] = headers;
+        }
+        
         str = JSON.stringify(obj);
         console.log('str: ' + str)
     } catch (error) {
@@ -195,6 +206,9 @@ function parseMessage(submitElement, messageElement, uuidElement) {
     }
     messageElement.value = "";
     uuidElement.value = "";
+    if (httpHeaderElement !== undefined) {
+        httpHeaderElement.value = "";
+    }
     // document.getElementById('proxyReqType').innerText = "";
     return str;
 }

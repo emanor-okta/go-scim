@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"net/http"
-
 	v2 "github.com/emanor-okta/go-scim/types/v2"
 )
 
@@ -46,16 +44,18 @@ type ReqFilter interface {
 }
 
 type ProxyFilter interface {
-	// FilterRequest(http.Header, []byte, string, string) []byte
 	FilterRequest(map[string][]string, []byte, string, string) (map[string][]string, []byte)
-	FilterResponse(http.Header, []*http.Cookie, []byte, string) []byte
+	/*
+		-- Not needed, FilterRequest will be used for both request/response and all supported methods
+		FilterResponse(http.Header, []*http.Cookie, []byte, string) []byte
 
-	GetRequest(http.Header, []byte, string) []byte
-	GetResponse(http.Header, []byte, string) []byte
-	PostRequest(http.Header, []byte, string) []byte
-	PostResponse(http.Header, []*http.Cookie, []byte, string) []byte
-	PutRequest(http.Header, []byte, string) []byte
-	PutResponse(http.Header, []byte, string) []byte
-	OptionsRequest(http.Header, []byte, string) []byte
-	OptionsResponse(http.Header, []byte, string) []byte
+		GetRequest(http.Header, []byte, string) []byte
+		GetResponse(http.Header, []byte, string) []byte
+		PostRequest(http.Header, []byte, string) []byte
+		PostResponse(http.Header, []*http.Cookie, []byte, string) []byte
+		PutRequest(http.Header, []byte, string) []byte
+		PutResponse(http.Header, []byte, string) []byte
+		OptionsRequest(http.Header, []byte, string) []byte
+		OptionsResponse(http.Header, []byte, string) []byte
+	*/
 }
