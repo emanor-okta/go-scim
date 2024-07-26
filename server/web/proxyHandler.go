@@ -195,6 +195,12 @@ func modifyResponseImpl(res *http.Response) error {
 	if filterResponseMessage(res.Request) {
 		h, b = (*config.ReqFilter).(*filters.ManualFilter).FilterRequest(h, bytesBody, fmt.Sprintf("%s Response For: %s", res.Request.Method, res.Request.RequestURI), "json")
 		res.Header = h
+		sb.Reset()
+		for k, v := range h {
+			sb.WriteString(fmt.Sprintf("%v : %v\n", k, v))
+			h[k] = v
+		}
+		header = sb.String()
 		// log.Printf("Filtered Message: \n%s\n", string(b))
 		messageLogBody = make([]byte, len(b))
 		copy(messageLogBody, b)

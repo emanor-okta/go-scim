@@ -64,6 +64,12 @@ func StartServer(c *utils.Configuration) {
 
 	// SSF Receiver
 	http.HandleFunc("/ssf/receiver", handleSSFReq)
+	http.HandleFunc("/ssf/receiver/app", handleSSFReciever)
+	http.HandleFunc("/ssf/receiver/app/config", handleSSFRecieverConfig)
+	http.HandleFunc("/ssf/receiver/app/login", handleSSFRecieverOauthLogin)
+	http.HandleFunc("/ssf/receiver/app/callback", handleSSFRecieverOauthCallback)
+	http.HandleFunc("/ssf/receiver/app/ws", handleSSFRecieverWebSocketUpgrade)
+	http.HandleFunc("/ssf/transmitter/app", handleSSFTransmitter)
 
 	/*
 	 * Redirect testing. Currently PUT does not follow by the client

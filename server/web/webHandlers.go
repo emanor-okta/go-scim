@@ -91,23 +91,8 @@ type MessagessTmpl struct {
 	ProxySwitchEnabled bool
 }
 
-// type ProxyFilterURL struct {
-// 	URL string
-// 	REQUEST,
-// 	RESPONSE,
-// 	POST,
-// 	PUT,
-// 	GET,
-// 	PATCH,
-// 	DELETE,
-// 	OPTIONS bool
-// }
-
 type ProxyFilterURLsTmpl struct {
-	// RequestURLs  []ProxyFilterURL
-	// ResponseURLs []ProxyFilterURL
 	URLs []utils.ProxyFilterURL
-	// URLs []ProxyFilterURL
 }
 
 var upgrader = websocket.Upgrader{
@@ -255,6 +240,9 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+/*
+SCIM Filters
+*/
 func handleFilters(res http.ResponseWriter, req *http.Request) {
 	fmt.Println("Returning Filters")
 	filterMutex.Lock()
@@ -269,6 +257,9 @@ func handleFilters(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+/*
+Proxy Filters
+*/
 func handleProxyFilters(res http.ResponseWriter, req *http.Request) {
 	fmt.Println("Returning Proxy Filters")
 	filterMutex.Lock()
@@ -303,43 +294,6 @@ func handleProxyFilters(res http.ResponseWriter, req *http.Request) {
 		fmt.Printf("%+v\n", err)
 	}
 }
-
-// func getProxyFilterURL(filterUrl string, methods map[string]bool) ProxyFilterURL {
-// 	proxyFilterURL := ProxyFilterURL{URL: filterUrl}
-// 	v, ok := methods["GET"]
-// 	if ok {
-// 		proxyFilterURL.GET = v
-// 	}
-// 	v, ok = methods["POST"]
-// 	if ok {
-// 		proxyFilterURL.POST = v
-// 	}
-// 	v, ok = methods["PUT"]
-// 	if ok {
-// 		proxyFilterURL.PUT = v
-// 	}
-// 	v, ok = methods["PATCH"]
-// 	if ok {
-// 		proxyFilterURL.PATCH = v
-// 	}
-// 	v, ok = methods["DELETE"]
-// 	if ok {
-// 		proxyFilterURL.DELETE = v
-// 	}
-// 	v, ok = methods["OPTIONS"]
-// 	if ok {
-// 		proxyFilterURL.OPTIONS = v
-// 	}
-// 	v, ok = methods["REQUEST"]
-// 	if ok {
-// 		proxyFilterURL.REQUEST = v
-// 	}
-// 	v, ok = methods["RESPONSE"]
-// 	if ok {
-// 		proxyFilterURL.RESPONSE = v
-// 	}
-// 	return proxyFilterURL
-// }
 
 // func handleConfig(res http.ResponseWriter, req *http.Request) {
 // 	fmt.Println("Returning Config")

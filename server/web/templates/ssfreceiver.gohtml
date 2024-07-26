@@ -1,0 +1,168 @@
+{{template "header" .}}
+
+<script src="/js/ws.js" type="text/javascript"></script>
+
+
+  <div class="row">
+    <div class="col-6"> 
+      <div class="container-fluid">
+        <h5 style="text-align:center">Received SSF Messages from Okta</h5>
+        <div>
+          <textarea style="resize:none" class="form-control" id="ssfReceiveMessageArea" name="ssfReceiveMessageArea" rows="30" cols="10" readonly></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6">
+      <h5 style="text-align:center">SSF Receiver Test Web App</h5>
+      <div>
+        {{ if .Authenticated }}
+          <hr/>
+          <h6 style="text-align:center">Logged In</h6>
+          <p>Username: {{ .Username }}</p>
+          <p>User ID: {{ .UUID }}</p>
+          <br>
+          <p>ID Token:</p>
+          <div style="word-wrap:break-word">{{.TokenReponse.IdToken}}</div>
+          <hr>
+          <div class="d-grid gap-2 col-6 mx-auto">
+            <button type="button" class="btn btn-outline-dark me-2" onclick="refresh(this)">Refresh</button>
+          </div>
+        {{ else }}
+          <div class="d-grid gap-2 col-6 mx-auto">
+            <button type="button" class="btn btn-outline-dark me-2" onclick="login(this)">Login</button>
+            <button type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#configureAppModal">Configure App</button>
+          </div>
+        {{ end }}
+
+        <div class="modal fade" id="configureAppModal" tabindex="-1" aria-labelledby="configureAppModalLabel" aria-hidden="true">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-body">
+                <form>
+                  <div class="mb-3">
+                    <label for="issuer-url" class="col-form-label">Issuer (Custom Authorization Server):</label>
+                    <input type="text" class="form-control" id="issuer-url" value="{{.OauthConfig.Issuer}}">
+                  </div>
+                  <div class="mb-3">
+                    <label for="client-id" class="col-form-label">Client Id:</label>
+                    <input type="text" class="form-control" id="client-id" value="{{.OauthConfig.ClientId}}">
+                  </div>
+                  <div class="mb-3">
+                    <label for="client-secret" class="col-form-label">Client Secret:</label>
+                    <input type="text" class="form-control" id="client-secret" value="{{.OauthConfig.ClientSecret}}">
+                  </div>
+                  <div class="mb-3">
+                    <label for="redirect-url" class="col-form-label">Redirect URI:</label>
+                    <input type="text" class="form-control" id="redirect-url" value="{{.OauthConfig.RedirectURI}}" readonly>
+                  </div>
+                  <hr/>
+                  
+                </form>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="saveAppConfig()">Save</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+      </div>
+    </div>
+  </div>
+
+
+<script type="text/javascript">
+    var ssfReceiveSocket;
+    intiializeSsfReceiverWS();
+
+    function login() {
+      window.location.href = '/ssf/receiver/app/login';
+    }
+
+    function refresh() {
+      window.location.href = '/ssf/receiver/app';
+    }
+
+    function saveAppConfig() {
+      // don't check values, if incorrect /authorize will error
+      const issuer = document.getElementById('issuer-url').value;
+      const client_id = document.getElementById('client-id').value;
+      const client_secret = document.getElementById('client-secret').value;
+      const redirect_url = document.getElementById('redirect-url').value;
+      const scopes = 'openid profile email';
+      const msg = JSON.stringify({issuer, client_id, client_secret, redirect_url, scopes});
+      sendPost(location.origin + "/ssf/receiver/app/config", msg, () => {});
+    }
+
+
+    /*
+      WS support
+    */
+    function intiializeSsfReceiverWS() {
+      console.log("Attempting intiializeSsfReceiverWS Connection...");
+      if (window.location.protocol.includes("https")) {
+          console.log("Attempting wss..");
+          ssfReceiveSocket = new WebSocket("wss://" + location.host + "/ssf/receiver/app/ws");
+      } else {
+          ssfReceiveSocket = new WebSocket("ws://" + location.host + "/ssf/receiver/app/ws");
+      }
+     
+      ssfReceiveSocket.onopen = () => {
+          console.log("Successfully Connected intiializeSsfReceiverWS()");
+          ssfReceiveWsPing();
+      };
+
+      ssfReceiveSocket.onmessage = ssfReceiveOnMessage;
+      ssfReceiveSocket.onclose = ssfReceiveOnClose;
+      ssfReceiveSocket.onerror = ssfReceiveOnError;
+    }
+
+    function ssfReceiveOnMessage(event) {
+      console.log('intiializeSsfReceiverWS message received')
+      console.log(event.data);
+      const jsonObj = JSON.parse(event.data);
+      var msg = createMessageReceivedHeader();
+      msg += JSON.stringify(jsonObj, '', 2)
+      msg += '\n' + document.getElementById('ssfReceiveMessageArea').value;
+      document.getElementById('ssfReceiveMessageArea').value = msg;
+      document.getElementById('ssfReceiveMessageArea').scrollTo(0, 0);
+    }
+
+    function ssfReceiveOnClose(event) {
+      console.log("intiializeSsfReceiverWS Socket Closed Connection: ", event);
+      ssfReceiveSocket.send("Client Closed!")
+    }
+
+    function ssfReceiveOnError(error) {
+      console.log("intiializeSsfReceiverWS Socket Error: ", error);
+    }
+
+    function ssfReceiveSendMessage(msg) {
+      ssfReceiveSocket.send(msg);
+    }
+
+    function ssfReceiveWsPing() {
+      if (!ssfReceiveSocket) return;
+      if (ssfReceiveSocket.readyState !== 1) return;
+      ssfReceiveSendMessage('{"uuid": "ping"}');
+      setTimeout(ssfReceiveWsPing, 10000);
+    }
+
+
+    /*
+      Helpers
+    */
+    function createMessageReceivedHeader() {
+      return `
+-------------------------------------------------------------------
+                          Received Message                          
+-------------------------------------------------------------------
+`
+    }
+
+</script>
+
+{{template "footer"}}
