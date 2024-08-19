@@ -24,35 +24,35 @@
           <textarea class="form-control" id="messageArea" name="messageArea" rows="20"></textarea>
         </div>
         <div class="col-md-4">
-          <h3>Message Types to Capture{{.UserGetResponse}}</h3>
+          <h3>Message Types to Capture{{.WebMessageFilter.UserGetResponse}}</h3>
           <hr/>
           <h5>Users:</h5>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="UserGetResponse" onclick="messageTypeToggled('UserGetResponse')" {{if .UserGetResponse}}checked{{end}}>
+            <input class="form-check-input" type="checkbox" id="UserGetResponse" onclick="messageTypeToggled('UserGetResponse')" {{if .WebMessageFilter.UserGetResponse}}checked{{end}}>
             <label class="form-check-label" for="UserGetResponse">GET /scim/v2/Users&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
           </div>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="UserPostRequest" onclick="messageTypeToggled('UserPostRequest')" {{if .UserPostRequest}}checked{{end}}>
+            <input class="form-check-input" type="checkbox" id="UserPostRequest" onclick="messageTypeToggled('UserPostRequest')" {{if .WebMessageFilter.UserPostRequest}}checked{{end}}>
             <label class="form-check-label" for="UserPostRequest">POST /scim/v2/Users&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">request message</span></label>
           </div>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="UserPostResponse" onclick="messageTypeToggled('UserPostResponse')" {{if .UserPostResponse}}checked{{end}}>
+            <input class="form-check-input" type="checkbox" id="UserPostResponse" onclick="messageTypeToggled('UserPostResponse')" {{if .WebMessageFilter.UserPostResponse}}checked{{end}}>
             <label class="form-check-label" for="UserPostResponse">POST /scim/v2/Users&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
           </div>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="UserIdGetResponse" onclick="messageTypeToggled('UserIdGetResponse')" {{if .UserIdGetResponse}}checked{{end}}>
+            <input class="form-check-input" type="checkbox" id="UserIdGetResponse" onclick="messageTypeToggled('UserIdGetResponse')" {{if .WebMessageFilter.UserIdGetResponse}}checked{{end}}>
             <label class="form-check-label" for="UserIdGetResponse">GET /scim/v2/Users/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
           </div>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="UserIdPutRequest" onclick="messageTypeToggled('UserIdPutRequest')" {{if .UserIdPutRequest}}checked{{end}}>
+            <input class="form-check-input" type="checkbox" id="UserIdPutRequest" onclick="messageTypeToggled('UserIdPutRequest')" {{if .WebMessageFilter.UserIdPutRequest}}checked{{end}}>
             <label class="form-check-label" for="UserIdPutRequest">PUT /scim/v2/Users/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">request message</span></label>
           </div>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="UserIdPutResponse" onclick="messageTypeToggled('UserIdPutResponse')" {{if .UserIdPutResponse}}checked{{end}}>
+            <input class="form-check-input" type="checkbox" id="UserIdPutResponse" onclick="messageTypeToggled('UserIdPutResponse')" {{if .WebMessageFilter.UserIdPutResponse}}checked{{end}}>
             <label class="form-check-label" for="UserIdPutResponse">PUT /scim/v2/Users/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
           </div>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="UserIdPatchRequest" onclick="messageTypeToggled('UserIdPatchRequest')" {{if .UserIdPatchRequest}}checked{{end}}>
+            <input class="form-check-input" type="checkbox" id="UserIdPatchRequest" onclick="messageTypeToggled('UserIdPatchRequest')" {{if .WebMessageFilter.UserIdPatchRequest}}checked{{end}}>
             <label class="form-check-label" for="UserIdPatchRequest">PATCH /scim/v2/Users/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">request message</span></label>
           </div>
           <!--div class="form-check form-switch">
@@ -62,31 +62,31 @@
           <hr/>
           <h5>Groups:</h5>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="GroupsGetResponse" onclick="messageTypeToggled('GroupsGetResponse')" {{if .GroupsGetResponse}}checked{{end}}>
+            <input class="form-check-input" type="checkbox" id="GroupsGetResponse" onclick="messageTypeToggled('GroupsGetResponse')" {{if .WebMessageFilter.GroupsGetResponse}}checked{{end}}>
             <label class="form-check-label" for="GroupsGetResponse">GET /scim/v2/Groups&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
           </div>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="GroupsPostRequest" onclick="messageTypeToggled('GroupsPostRequest')" {{if .GroupsPostRequest}}checked{{end}}>
+            <input class="form-check-input" type="checkbox" id="GroupsPostRequest" onclick="messageTypeToggled('GroupsPostRequest')" {{if .WebMessageFilter.GroupsPostRequest}}checked{{end}}>
             <label class="form-check-label" for="GroupsPostRequest">POST /scim/v2/Groups&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">request message</span></label>
           </div>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="GroupsPostResponse" onclick="messageTypeToggled('GroupsPostResponse')" {{if .GroupsPostResponse}}checked{{end}}>
+            <input class="form-check-input" type="checkbox" id="GroupsPostResponse" onclick="messageTypeToggled('GroupsPostResponse')" {{if .WebMessageFilter.GroupsPostResponse}}checked{{end}}>
             <label class="form-check-label" for="GroupsPostResponse">POST /scim/v2/Groups&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
           </div>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="GroupsIdGetResponse" onclick="messageTypeToggled('GroupsIdGetResponse')" {{if .GroupsIdGetResponse}}checked{{end}}>
+            <input class="form-check-input" type="checkbox" id="GroupsIdGetResponse" onclick="messageTypeToggled('GroupsIdGetResponse')" {{if .WebMessageFilter.GroupsIdGetResponse}}checked{{end}}>
             <label class="form-check-label" for="UserIdGetGroupsIdGetResponseResponse">GET /scim/v2/Groups/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
           </div>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="GroupsIdPutRequest" onclick="messageTypeToggled('GroupsIdPutRequest')" {{if .GroupsIdPutRequest}}checked{{end}}>
+            <input class="form-check-input" type="checkbox" id="GroupsIdPutRequest" onclick="messageTypeToggled('GroupsIdPutRequest')" {{if .WebMessageFilter.GroupsIdPutRequest}}checked{{end}}>
             <label class="form-check-label" for="GroupsIdPutRequest">PUT /scim/v2/Groups/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">request message</span></label>
           </div>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="GroupsIdPutResponse" onclick="messageTypeToggled('GroupsIdPutResponse')" {{if .GroupsIdPutResponse}}checked{{end}}>
+            <input class="form-check-input" type="checkbox" id="GroupsIdPutResponse" onclick="messageTypeToggled('GroupsIdPutResponse')" {{if .WebMessageFilter.GroupsIdPutResponse}}checked{{end}}>
             <label class="form-check-label" for="GroupsIdPutResponse">PUT /scim/v2/Groups/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">response message</span></label>
           </div>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="GroupsIdPatchRequest" onclick="messageTypeToggled('GroupsIdPatchRequest')" {{if .GroupsIdPatchRequest}}checked{{end}}>
+            <input class="form-check-input" type="checkbox" id="GroupsIdPatchRequest" onclick="messageTypeToggled('GroupsIdPatchRequest')" {{if .WebMessageFilter.GroupsIdPatchRequest}}checked{{end}}>
             <label class="form-check-label" for="GroupsIdPatchRequest">PATCH /scim/v2/Groups/&lt;id&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:gray">request message</span></label>
           </div>
         </div>

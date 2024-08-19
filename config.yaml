@@ -1,3 +1,7 @@
+services:
+    scim: true
+    proxy: true
+    ssf: true
 redis:
     address: localhost:6379
     # address: redis-scim:6379
@@ -13,7 +17,10 @@ server:
     log_messages: false
     proxy_messages: false
     proxy_address: ":8084"
+    filter_ips: true
+    okta_public_ips_url: "https://s3.amazonaws.com/okta-ip-ranges/ip_ranges.json"
 scim:
     enable_groups: true
     users_endpoint: "/goscim/scim/v2/Users"
     groups_endpoint: "/goscim/scim/v2/Groups"
+build: "v1.22.001"

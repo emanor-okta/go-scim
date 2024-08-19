@@ -148,9 +148,8 @@ func (f ManualFilter) GroupsIdPatchRequest(ops *v2.PatchOp, path string) {
 }
 
 /*
- * ProxyFilter Implementations
+ * ProxyFilter Implementation
  */
-// func (f ManualFilter) FilterRequest(h http.Header, b []byte, path, contentType string) []byte {
 func (f ManualFilter) FilterRequest(h map[string][]string, b []byte, path, contentType string) (map[string][]string, []byte) {
 	m := map[string]interface{}{}
 	m["httpHeaders"] = map[string][]string{}
@@ -184,22 +183,6 @@ func (f ManualFilter) FilterRequest(h map[string][]string, b []byte, path, conte
 }
 
 /*
-func (f ManualFilter) FilterResponse(http.Header, []*http.Cookie, []byte, string) []byte {
-	return nil
-}
-
-func (f ManualFilter) GetRequest(h http.Header, b []byte, path string) []byte {
-	return nil
-}
-
-func (f ManualFilter) GetResponse(h http.Header, b []byte, path string) []byte {
-	return nil
-}
-
-func (f ManualFilter) PostRequest(h http.Header, b []byte, path string) []byte {
-
-	return nil
-}
 
 func (f ManualFilter) PostResponse(h http.Header, c []*http.Cookie, b []byte, path string) []byte {
 	fmt.Printf(">> FILTER %s <<\n", path)
@@ -227,22 +210,6 @@ func (f ManualFilter) PostResponse(h http.Header, c []*http.Cookie, b []byte, pa
 	}
 
 	// }
-	return nil
-}
-
-func (f ManualFilter) PutRequest(h http.Header, b []byte, path string) []byte {
-	return nil
-}
-
-func (f ManualFilter) PutResponse(h http.Header, b []byte, path string) []byte {
-	return nil
-}
-
-func (f ManualFilter) OptionsRequest(h http.Header, b []byte, path string) []byte {
-	return nil
-}
-
-func (f ManualFilter) OptionsResponse(h http.Header, b []byte, path string) []byte {
 	return nil
 }
 */

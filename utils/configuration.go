@@ -1,11 +1,14 @@
 package utils
 
 import (
-	"io/ioutil"
 	"log"
+	"os"
 
 	"gopkg.in/yaml.v3"
 )
+
+// Configuration Instance
+var Config *Configuration
 
 //	type ProxyMessageFilterMethods struct {
 //		GET,
@@ -27,27 +30,38 @@ type ProxyFilterURL struct {
 	OPTIONS  bool   `json:"options"`
 }
 
+type Services struct {
+	Scim,
+	Proxy,
+	Ssf bool
+}
+
 type Configuration struct {
+	Build     string
 	ReqFilter *ReqFilter
-	Redis     struct {
+	Services
+	Redis struct {
 		Address  string
 		Password string
 		Db       int
 	}
 	Server struct {
-		Address        string
-		Web_address    string
-		Web_console    bool
-		Debug_headers  bool
-		Debug_body     bool
-		Debug_query    bool
-		Log_messages   bool
-		Proxy_messages bool
-		Proxy_address  string
-		Proxy_port     int
-		Proxy_origin   string
-		Proxy_sni      string
-		ProxyDisabled  bool
+		Address             string
+		Web_address         string
+		Web_console         bool
+		Debug_headers       bool
+		Debug_body          bool
+		Debug_query         bool
+		Log_messages        bool
+		Proxy_messages      bool
+		Proxy_address       string
+		Proxy_port          int
+		Proxy_origin        string
+		Proxy_sni           string
+		ProxyDisabled       bool
+		Filter_ips          bool
+		Okta_public_ips_url string
+		Allowed_ips         map[string]string
 	}
 	Scim struct {
 		Enable_groups     bool
@@ -87,7 +101,7 @@ type Configuration struct {
 
 func LoadConfig(c string) *Configuration {
 	var config Configuration
-	buf, err := ioutil.ReadFile(c)
+	buf, err := os.ReadFile(c)
 	if err != nil {
 		log.Fatalf("No Configuration file exists: %v\n", err)
 	}
@@ -106,9 +120,9 @@ func LoadConfig(c string) *Configuration {
 	config.ProxyMessageFilter.FilterMessages = false
 
 	//TEST
-	config.ProxyMessageFilter.FilterMessages = true
-	config.ProxyMessageFilter.FilterURLs["/get"] = ProxyFilterURL{URL: "/get", GET: true, REQUEST: true, RESPONSE: false}
-	config.ProxyMessageFilter.FilterURLs["/put"] = ProxyFilterURL{URL: "/put", PUT: true, REQUEST: true, RESPONSE: false}
+	// config.ProxyMessageFilter.FilterMessages = true
+	// config.ProxyMessageFilter.FilterURLs["/get"] = ProxyFilterURL{URL: "/get", GET: true, REQUEST: true, RESPONSE: false}
+	// config.ProxyMessageFilter.FilterURLs["/put"] = ProxyFilterURL{URL: "/put", PUT: true, REQUEST: true, RESPONSE: false}
 	// config.ProxyMessageFilter.FilterURLs["https://httpbin.org/get"]["POST"] = true
 	// config.ProxyMessageFilter.FilterURLs["https://httpbin.org/get"]["REQUEST"] = true
 	// config.ProxyMessageFilter.FilterURLs["https://httpbin.org/get"]["RESPONSE"] = false
@@ -122,5 +136,6 @@ func LoadConfig(c string) *Configuration {
 
 	//END TEST
 
+	Config = &config
 	return &config
 }

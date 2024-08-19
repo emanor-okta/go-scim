@@ -11,8 +11,11 @@ import (
 func main() {
 	fmt.Println("Starting")
 	config := utils.LoadConfig("config.yaml")
-	if err := utils.InitializeRedis(config); err != nil {
-		log.Fatalf("Error initializing Redis: %v\n", err)
+
+	if config.Services.Scim {
+		if err := utils.InitializeRedis(config); err != nil {
+			log.Fatalf("Error initializing Redis: %v\n", err)
+		}
 	}
 
 	// user := v2.EnterpriseUser{}

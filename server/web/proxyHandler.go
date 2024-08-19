@@ -22,7 +22,6 @@ import (
 	"github.com/klauspost/compress/zstd"
 
 	"github.com/emanor-okta/go-scim/apps"
-	"github.com/emanor-okta/go-scim/filters"
 	messageLogs "github.com/emanor-okta/go-scim/server/log"
 	"github.com/emanor-okta/go-scim/utils"
 	// br "github.com/google/brotli/go/cbrotli"
@@ -32,37 +31,13 @@ import (
 const http_header_scim_id = "X-Go-Scim-Id"
 const proxy_msg = "proxy.gohtml"
 
-/*
-type MessageType int
-const (
-	Request MessageType = iota
-	Response
-)
-
-type ProxyEndpoint struct {
-	Url string
-	Method string
-	Type MessageType
-}
-*/
-
-/*
-type RequestPathTmpl struct {
-	Path string
-	Method map[string]bool
-}
-
-type RequestPathsTmpl struct {
-	Paths []RequestPathTmpl
-}
-*/
-
 var server *http.Server
 var proxy *httputil.ReverseProxy
 
 func init() {
 	// with default Mux can only add a specific route once so do in init() instead of startProxy()
-	http.HandleFunc("/", handleProxy)
+	// commonMiddlewares is defined/set in webHandlers.go. Should probably be moved to config.
+	http.HandleFunc("/", utils.AddMiddleware(handleProxy, commonMiddlewares...))
 }
 
 func startProxy(address string, originUrl *url.URL, sni string) {
@@ -193,7 +168,8 @@ func modifyResponseImpl(res *http.Response) error {
 
 	messageLogBody := bytesBody
 	if filterResponseMessage(res.Request) {
-		h, b = (*config.ReqFilter).(*filters.ManualFilter).FilterRequest(h, bytesBody, fmt.Sprintf("%s Response For: %s", res.Request.Method, res.Request.RequestURI), "json")
+		// h, b = (*config.ReqFilter).(*filters.ManualFilter).FilterRequest(h, bytesBody, fmt.Sprintf("%s Response For: %s", res.Request.Method, res.Request.RequestURI), "json")
+		h, b = (*config.ReqFilter).FilterRequest(h, bytesBody, fmt.Sprintf("%s Response For: %s", res.Request.Method, res.Request.RequestURI), "json")
 		res.Header = h
 		sb.Reset()
 		for k, v := range h {
@@ -322,7 +298,8 @@ func handleProxy(res http.ResponseWriter, req *http.Request) {
 			// Should this message be filtered
 			if filterRequestMessage(req) {
 				var newBytes []byte
-				h, newBytes = (*config.ReqFilter).(*filters.ManualFilter).FilterRequest(h, []byte(m.RequestBody), fmt.Sprintf("%s Request For: %s", req.Method, req.RequestURI), contentType)
+				// h, newBytes = (*config.ReqFilter).(*filters.ManualFilter).FilterRequest(h, []byte(m.RequestBody), fmt.Sprintf("%s Request For: %s", req.Method, req.RequestURI), contentType)
+				h, newBytes = (*config.ReqFilter).FilterRequest(h, []byte(m.RequestBody), fmt.Sprintf("%s Request For: %s", req.Method, req.RequestURI), contentType)
 				req.Body = io.NopCloser(bytes.NewBuffer(newBytes))
 				if req.ContentLength > 0 {
 					req.ContentLength = int64(len(newBytes))
@@ -334,7 +311,8 @@ func handleProxy(res http.ResponseWriter, req *http.Request) {
 		}
 	} else if req.Method == http.MethodGet || req.Method == http.MethodOptions || req.Method == http.MethodDelete {
 		if filterRequestMessage(req) {
-			h, _ = (*config.ReqFilter).(*filters.ManualFilter).FilterRequest(h, []byte{}, fmt.Sprintf("%s Request to: %s", req.Method, req.RequestURI), "")
+			// h, _ = (*config.ReqFilter).(*filters.ManualFilter).FilterRequest(h, []byte{}, fmt.Sprintf("%s Request to: %s", req.Method, req.RequestURI), "")
+			h, _ = (*config.ReqFilter).FilterRequest(h, []byte{}, fmt.Sprintf("%s Request to: %s", req.Method, req.RequestURI), "")
 		}
 	}
 

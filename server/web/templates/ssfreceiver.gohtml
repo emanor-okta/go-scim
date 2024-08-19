@@ -14,61 +14,8 @@
     </div>
 
     <div class="col-6">
-      <h5 style="text-align:center">SSF Receiver Test Web App</h5>
-      <div>
-        {{ if .Authenticated }}
-          <hr/>
-          <h6 style="text-align:center">Logged In</h6>
-          <p>Username: {{ .Username }}</p>
-          <p>User ID: {{ .UUID }}</p>
-          <br>
-          <p>ID Token:</p>
-          <div style="word-wrap:break-word">{{.TokenReponse.IdToken}}</div>
-          <hr>
-          <div class="d-grid gap-2 col-6 mx-auto">
-            <button type="button" class="btn btn-outline-dark me-2" onclick="refresh(this)">Refresh</button>
-          </div>
-        {{ else }}
-          <div class="d-grid gap-2 col-6 mx-auto">
-            <button type="button" class="btn btn-outline-dark me-2" onclick="login(this)">Login</button>
-            <button type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#configureAppModal">Configure App</button>
-          </div>
-        {{ end }}
-
-        <div class="modal fade" id="configureAppModal" tabindex="-1" aria-labelledby="configureAppModalLabel" aria-hidden="true">
-          <div class="modal-dialog">
-            <div class="modal-content">
-              <div class="modal-body">
-                <form>
-                  <div class="mb-3">
-                    <label for="issuer-url" class="col-form-label">Issuer (Custom Authorization Server):</label>
-                    <input type="text" class="form-control" id="issuer-url" value="{{.OauthConfig.Issuer}}">
-                  </div>
-                  <div class="mb-3">
-                    <label for="client-id" class="col-form-label">Client Id:</label>
-                    <input type="text" class="form-control" id="client-id" value="{{.OauthConfig.ClientId}}">
-                  </div>
-                  <div class="mb-3">
-                    <label for="client-secret" class="col-form-label">Client Secret:</label>
-                    <input type="text" class="form-control" id="client-secret" value="{{.OauthConfig.ClientSecret}}">
-                  </div>
-                  <div class="mb-3">
-                    <label for="redirect-url" class="col-form-label">Redirect URI:</label>
-                    <input type="text" class="form-control" id="redirect-url" value="{{.OauthConfig.RedirectURI}}" readonly>
-                  </div>
-                  <hr/>
-                  
-                </form>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="saveAppConfig()">Save</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-
+      <div class="container-fluid">
+        <iframe src="/ssf/receiver/app/embed" style="width: 100%; height: 100%"></iframe>
       </div>
     </div>
   </div>
@@ -77,25 +24,6 @@
 <script type="text/javascript">
     var ssfReceiveSocket;
     intiializeSsfReceiverWS();
-
-    function login() {
-      window.location.href = '/ssf/receiver/app/login';
-    }
-
-    function refresh() {
-      window.location.href = '/ssf/receiver/app';
-    }
-
-    function saveAppConfig() {
-      // don't check values, if incorrect /authorize will error
-      const issuer = document.getElementById('issuer-url').value;
-      const client_id = document.getElementById('client-id').value;
-      const client_secret = document.getElementById('client-secret').value;
-      const redirect_url = document.getElementById('redirect-url').value;
-      const scopes = 'openid profile email';
-      const msg = JSON.stringify({issuer, client_id, client_secret, redirect_url, scopes});
-      sendPost(location.origin + "/ssf/receiver/app/config", msg, () => {});
-    }
 
 
     /*

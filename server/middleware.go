@@ -5,29 +5,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	messageLogs "github.com/emanor-okta/go-scim/server/log"
+	"github.com/emanor-okta/go-scim/utils"
 )
 
-type Middleware func(http.HandlerFunc) http.HandlerFunc
+//type Middleware func(http.HandlerFunc) http.HandlerFunc
 
-func addMiddleware(h http.HandlerFunc, m ...Middleware) http.HandlerFunc {
-	if len(m) < 1 {
-		return h
-	}
+const (
+	_logPrefix = "server.middleware."
+)
 
-	middlewares := h
-	for _, v := range m {
-		middlewares = v(middlewares)
-	}
+// func addMiddleware(h http.HandlerFunc, m ...types.Middleware) http.HandlerFunc {
+// 	if len(m) < 1 {
+// 		return h
+// 	}
 
-	return middlewares
-}
+// 	middlewares := h
+// 	for _, v := range m {
+// 		middlewares = v(middlewares)
+// 	}
+
+// 	return middlewares
+// }
 
 func getHeadersMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +51,7 @@ func getBodyMiddleware(h http.HandlerFunc) http.HandlerFunc {
 		if r.Method == http.MethodPost || r.Method == http.MethodPatch || r.Method == http.MethodPut {
 			b, err := io.ReadAll(r.Body)
 			r.Body.Close()
-			r.Body = ioutil.NopCloser(bytes.NewBuffer(b))
+			r.Body = io.NopCloser(bytes.NewBuffer(b))
 			if err != nil {
 				fmt.Printf("Error reading Json Data: %v\n", err)
 				defer h.ServeHTTP(w, r)
@@ -60,6 +64,32 @@ func getBodyMiddleware(h http.HandlerFunc) http.HandlerFunc {
 			fmt.Printf("\n%v\n", sb.String())
 		}
 		h.ServeHTTP(w, r)
+	})
+}
+
+func filterIpMiddleware(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// if config.Server.FilterIPs {
+		// Need to find correct way to do this, for now check X-Forwarded-For, followed by ReoteAddr
+		addr := utils.GetRemoteAddress(r)
+		// addr := r.Header.Get("X-Forwarded-For")
+		// if addr == "" {
+		// 	addr = r.RemoteAddr
+		// 	if addr != "" {
+		// 		index := strings.LastIndex(addr, ":")
+		// 		if index > -1 {
+		// 			addr = addr[0:index]
+		// 		}
+		// 	}
+		// }
+		fmt.Printf("Address: %s\n", addr)
+		_, ok := config.Server.Allowed_ips[addr]
+		if ok {
+			h.ServeHTTP(w, r)
+		} else {
+			log.Printf("%sfilterIpMiddleware: Denying Request from %s\n", _logPrefix, addr)
+			w.WriteHeader(http.StatusForbidden)
+		}
 	})
 }
 
@@ -87,7 +117,7 @@ func logMessagesMiddleware(h http.HandlerFunc) http.HandlerFunc {
 			if r.Method == http.MethodPost || r.Method == http.MethodPatch || r.Method == http.MethodPut {
 				b, err := io.ReadAll(r.Body)
 				r.Body.Close()
-				r.Body = ioutil.NopCloser(bytes.NewBuffer(b))
+				r.Body = io.NopCloser(bytes.NewBuffer(b))
 				if err != nil {
 					fmt.Printf("Error reading Json Data: %v\n", err)
 					defer h.ServeHTTP(w, r)

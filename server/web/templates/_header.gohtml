@@ -37,6 +37,7 @@
             <li><a class="dropdown-item" href="/filters">Manual</a></li>
           </ul>
         </li> */}}
+        {{if .Services.Scim}}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
             SCIM
@@ -48,6 +49,8 @@
             <li><a class="dropdown-item" href="/filters">Filter</a></li>
           </ul>
         </li>
+        {{end}}
+        {{if .Services.Proxy}}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
             GW / Reverse Proxy
@@ -57,6 +60,8 @@
             <li><a class="dropdown-item" href="/proxyfilter">Filter</a></li>
           </ul>
         </li>
+        {{end}}
+        {{if .Services.Ssf}}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
             Shared Signals
@@ -66,13 +71,18 @@
             <li><a class="dropdown-item" href="/ssf/transmitter/app">SSF Transmitter App</a></li>
           </ul>
         </li>
+        {{end}}
         {{/* <li class="nav-item">
           <a class="nav-link" href="/proxy">Reverse Proxy</a>
         </li> */}}
       </ul>
       <form class="d-flex">
+        {{if or (.Services.Scim) (.Services.Proxy)}}
         <button id="clear-msg-button" type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#flushMsgModal">Clear Messages</button>
+        {{end}}
+        {{if .Services.Scim}}
         <button id="flush-db-button" type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#flushDbModal">Flush Redis</button>
+        {{end}}
       </form>
     
 

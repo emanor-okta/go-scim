@@ -20,6 +20,7 @@ import (
 
 	"github.com/emanor-okta/go-scim/filters"
 	messageLogs "github.com/emanor-okta/go-scim/server/log"
+	"github.com/emanor-okta/go-scim/types"
 	v2 "github.com/emanor-okta/go-scim/types/v2"
 	"github.com/emanor-okta/go-scim/utils"
 )
@@ -35,6 +36,7 @@ var wsConn *websocket.Conn
 var manualFilter filters.ManualFilter
 var filterMutex sync.Mutex
 var filterId int
+var commonMiddlewares []types.Middleware
 
 type PagePagination struct {
 	Pagination   []int
@@ -51,10 +53,11 @@ type UserTmpl struct {
 }
 
 type UsersTmpl struct {
-	Users []UserTmpl
-	Count int
-	PP    PagePagination
-	Error error
+	Users    []UserTmpl
+	Count    int
+	PP       PagePagination
+	Error    error
+	Services utils.Services
 }
 
 type GroupTmpl struct {
@@ -64,10 +67,11 @@ type GroupTmpl struct {
 }
 
 type GroupsTmpl struct {
-	Groups []GroupTmpl
-	Count  int
-	PP     PagePagination
-	Error  error
+	Groups   []GroupTmpl
+	Count    int
+	PP       PagePagination
+	Error    error
+	Services utils.Services
 }
 
 // type MessageTmpl struct {
@@ -89,10 +93,12 @@ type MessagessTmpl struct {
 	ProxyOrigin        string
 	SNI                string
 	ProxySwitchEnabled bool
+	Services           utils.Services
 }
 
 type ProxyFilterURLsTmpl struct {
-	URLs []utils.ProxyFilterURL
+	URLs     []utils.ProxyFilterURL
+	Services utils.Services
 }
 
 var upgrader = websocket.Upgrader{
@@ -101,33 +107,46 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     nil, //func(r *http.Request) bool { return true },
 }
 
-func StartWebServer(c *utils.Configuration) {
+func StartWebServer(c *utils.Configuration, mw []types.Middleware) {
 	config = c
+	commonMiddlewares = mw
 	tpl = template.Must(template.ParseGlob("server/web/templates/*"))
 
-	http.HandleFunc("/messages", handleMessages)
-	http.HandleFunc("/proxy", handleProxyMessages)
-	http.HandleFunc("/users", handleUsers)
-	http.HandleFunc("/users/update", handleUpdateUser)
-	http.HandleFunc("/users/delete", handleDeleteUser)
-	http.HandleFunc("/groups", handleGroups)
-	http.HandleFunc("/groups/update", handleUpdateGroup)
-	http.HandleFunc("/groups/delete", handleDeleteGroup)
-	http.HandleFunc("/filters/ws", handleWebSocketUpgrade)
-	http.HandleFunc("/filters", handleFilters)
-	http.HandleFunc("/proxyfilter", handleProxyFilters)
-	http.HandleFunc("/filters/toggle", handleToggleFilter)
-	http.HandleFunc("/proxyfilter/toggle", handleProxyToggleFilter)
-	// http.HandleFunc("/config", handleConfig)
-	http.HandleFunc("/js/ws.js", handleJavascript)
-	http.HandleFunc("/js/ui.js", handleJavascript)
-	http.HandleFunc("/raw/user.json", handleRawJSON)
-	http.HandleFunc("/raw/group.json", handleRawJSON)
-	http.HandleFunc("/redis/flush", handleFlush)
-	http.HandleFunc("/messages/flush", handleFlush)
-	http.HandleFunc("/messages/toggle", handleToggleMessageLogging)
-	http.HandleFunc("/proxy/toggle", handleToggleProxyLogging)
-	http.HandleFunc("/har/generate", handleHarGeneration)
+	if c.Services.Scim {
+		http.HandleFunc("/messages", utils.AddMiddleware(handleMessages, commonMiddlewares...))
+		http.HandleFunc("/messages/toggle", utils.AddMiddleware(handleToggleMessageLogging, commonMiddlewares...))
+		http.HandleFunc("/users", utils.AddMiddleware(handleUsers, commonMiddlewares...))
+		http.HandleFunc("/users/update", utils.AddMiddleware(handleUpdateUser, commonMiddlewares...))
+		http.HandleFunc("/users/delete", utils.AddMiddleware(handleDeleteUser, commonMiddlewares...))
+		http.HandleFunc("/groups", utils.AddMiddleware(handleGroups, commonMiddlewares...))
+		http.HandleFunc("/groups/update", utils.AddMiddleware(handleUpdateGroup, commonMiddlewares...))
+		http.HandleFunc("/groups/delete", utils.AddMiddleware(handleDeleteGroup, commonMiddlewares...))
+		http.HandleFunc("/filters/ws", utils.AddMiddleware(handleWebSocketUpgrade, commonMiddlewares...))
+		http.HandleFunc("/filters/proxy/ws", utils.AddMiddleware(handleProxyWebSocketUpgrade, commonMiddlewares...))
+		http.HandleFunc("/filters", utils.AddMiddleware(handleFilters, commonMiddlewares...))
+		http.HandleFunc("/filters/toggle", utils.AddMiddleware(handleToggleFilter, commonMiddlewares...))
+		http.HandleFunc("/redis/flush", utils.AddMiddleware(handleFlush, commonMiddlewares...))
+		http.HandleFunc("/raw/user.json", utils.AddMiddleware(handleRawJSON, commonMiddlewares...))
+		http.HandleFunc("/raw/group.json", utils.AddMiddleware(handleRawJSON, commonMiddlewares...))
+	}
+	if c.Services.Proxy {
+		http.HandleFunc("/proxy", utils.AddMiddleware(handleProxyMessages, commonMiddlewares...))
+		http.HandleFunc("/proxyfilter", utils.AddMiddleware(handleProxyFilters, commonMiddlewares...))
+		http.HandleFunc("/proxyfilter/toggle", utils.AddMiddleware(handleProxyToggleFilter, commonMiddlewares...))
+		http.HandleFunc("/proxy/toggle", utils.AddMiddleware(handleToggleProxyLogging, commonMiddlewares...))
+	}
+	if c.Services.Proxy || c.Services.Scim {
+		http.HandleFunc("/messages/flush", utils.AddMiddleware(handleFlush, commonMiddlewares...))
+	}
+
+	http.HandleFunc("/js/ws.js", utils.AddMiddleware(handleJavascript, commonMiddlewares...))
+	http.HandleFunc("/js/ui.js", utils.AddMiddleware(handleJavascript, commonMiddlewares...))
+	http.HandleFunc("/har/generate", utils.AddMiddleware(handleHarGeneration, commonMiddlewares...))
+
+	// Show Authorize page for unauthorized IP
+	http.HandleFunc("/authorizeMyIp", handleShowAuthorizeMyIp)
+	http.HandleFunc("/authorizeMyIpAuthorize", handleAuthorizeMyIp)
+	http.HandleFunc("/authorizeMyIp/callback", handleAuthorizeMyIpCallback)
 
 	// fmt.Printf("Starting Web Console on %v\n", config.Server.Web_address)
 	// if err := http.ListenAndServe(config.Server.Web_address, nil); err != nil {
@@ -157,6 +176,46 @@ func StartWebServer(c *utils.Configuration) {
 	*/
 }
 
+/*
+http handlers to start OAuth for an unauthorized IP
+*/
+func handleShowAuthorizeMyIp(res http.ResponseWriter, req *http.Request) {
+	MyAddress := utils.GetRemoteAddress(req)
+	Payload := struct {
+		MyAddress string
+	}{MyAddress: MyAddress}
+	tpl.ExecuteTemplate(res, "authorizeMyIp.gohtml", Payload)
+}
+
+func handleAuthorizeMyIp(res http.ResponseWriter, req *http.Request) {
+	// hardcode for now
+	oauthConfig := types.OauthConfig{
+		Issuer:       "https://emanor-oie.oktapreview.com/oauth2/default",
+		ClientId:     "0oa2cpl777xczKzL21d7",
+		ClientSecret: "Klf03TzBqEuayATkPGy7VgTqyNDKIPsIYNd9TEKo",
+		Scopes:       "openid profile email",
+		RedirectURI:  "http://localhost:8082/authorizeMyIp/callback",
+	}
+	var callback = func(res http.ResponseWriter, req *http.Request, tokenResponse types.TokenReponse) {
+		if tokenResponse.IdToken != "" {
+			// don't check for any claim for now
+			config.Server.Allowed_ips[utils.GetRemoteAddress(req)] = "_"
+			http.Redirect(res, req, "/messages", http.StatusTemporaryRedirect)
+		} else {
+			http.Redirect(res, req, "/handleShowAuthorizeMyIp", http.StatusTemporaryRedirect)
+		}
+	}
+
+	utils.Authorize(res, req, oauthConfig, callback)
+}
+
+func handleAuthorizeMyIpCallback(res http.ResponseWriter, req *http.Request) {
+	utils.HandleOauthCallback(res, req)
+}
+
+/*
+SCIM Handlers
+*/
 func handleMessages(res http.ResponseWriter, req *http.Request) {
 	fmt.Println("Returning Messages")
 	getMessages(res, req, "messages.gohtml")
@@ -181,7 +240,7 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 	fmt.Println("Returning Users")
 	totalUserCount, err := utils.GetUserCount()
 	if err != nil {
-		usersTmpl := UsersTmpl{Error: err}
+		usersTmpl := UsersTmpl{Error: err, Services: config.Services}
 		tpl.ExecuteTemplate(res, "users.gohtml", usersTmpl)
 		return
 	}
@@ -195,6 +254,7 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 	start, current := getPaginationPage(page, items_per_page)
 	usersTmpl := getUsers(start, fmt.Sprintf("%d", items_per_page), req)
 	usersTmpl.PP = computePagePagination(current, int(totalUserCount), items_per_page)
+	usersTmpl.Services = config.Services
 	if usersTmpl.Error != nil {
 		usersTmpl := UsersTmpl{Error: usersTmpl.Error}
 		tpl.ExecuteTemplate(res, "users.gohtml", usersTmpl)
@@ -213,7 +273,7 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 	fmt.Println("Returning Groups")
 	totalGroupCount, err := utils.GetGroupCount()
 	if err != nil {
-		groupsTmpl := GroupsTmpl{Error: err}
+		groupsTmpl := GroupsTmpl{Error: err, Services: config.Services}
 		tpl.ExecuteTemplate(res, "groups.gohtml", groupsTmpl)
 	}
 
@@ -226,6 +286,7 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 	start, current := getPaginationPage(page, items_per_page)
 	groupsTmpl := getGroups(start, fmt.Sprintf("%d", items_per_page), req)
 	groupsTmpl.PP = computePagePagination(current, int(totalGroupCount), items_per_page)
+	groupsTmpl.Services = config.Services
 	if groupsTmpl.Error != nil {
 		groupsTmpl := UsersTmpl{Error: groupsTmpl.Error}
 		tpl.ExecuteTemplate(res, "groups.gohtml", groupsTmpl)
@@ -251,54 +312,11 @@ func handleFilters(res http.ResponseWriter, req *http.Request) {
 	filterId++
 	filterMutex.Unlock()
 
-	err := tpl.ExecuteTemplate(res, "filters.gohtml", config.WebMessageFilter)
+	err := tpl.ExecuteTemplate(res, "filters.gohtml", config)
 	if err != nil {
 		fmt.Printf("%+v\n", err)
 	}
 }
-
-/*
-Proxy Filters
-*/
-func handleProxyFilters(res http.ResponseWriter, req *http.Request) {
-	fmt.Println("Returning Proxy Filters")
-	filterMutex.Lock()
-	manualFilter = filters.ManualFilter{Config: config, WsConn: nil, ReqMap: make(map[string]chan interface{}, 0)}
-	*config.ReqFilter = &manualFilter
-	filterId++
-	filterMutex.Unlock()
-
-	Tmpl := ProxyFilterURLsTmpl{}
-	//Tmpl.URLs = []ProxyFilterURL{}
-	urls := []utils.ProxyFilterURL{}
-	for _, v := range config.ProxyMessageFilter.FilterURLs {
-		urls = append(urls, v)
-	}
-	// Tmpl.URLs = config.ProxyMessageFilter.FilterURLs
-	Tmpl.URLs = urls
-
-	// Tmpl.ResponseURLs = []ProxyFilterURL{}
-	// for _, v := range config.WebMessageFilter.
-	fmt.Println(config.ProxyMessageFilter.FilterMessages)
-	// if config.ProxyMessageFilter.FilterMessages {
-	// 	for key, value := range config.ProxyMessageFilter.FilterURLs {
-	// 		Tmpl.URLs = append(Tmpl.URLs, getProxyFilterURL(key, value))
-	// 	}
-	// 	// for key, value := range config.ProxyMessageFilter.ResponseMessages {
-	// 	// 	Tmpl.ResponseURLs = append(Tmpl.ResponseURLs, getProxyFilterURL(key, value))
-	// 	// }
-	// }
-	fmt.Printf("%+v\n", Tmpl)
-	err := tpl.ExecuteTemplate(res, "proxyfilter.gohtml", Tmpl)
-	if err != nil {
-		fmt.Printf("%+v\n", err)
-	}
-}
-
-// func handleConfig(res http.ResponseWriter, req *http.Request) {
-// 	fmt.Println("Returning Config")
-// 	tpl.ExecuteTemplate(res, "config.gohtml", nil)
-// }
 
 func handleUpdateUser(res http.ResponseWriter, req *http.Request) {
 	handleUpdate(res, req, fmt.Sprintf("%s%s/goscim/scim/v2/Users", getScheme(req.TLS, req.Host), req.Host))
@@ -405,6 +423,11 @@ func handleHarGeneration(res http.ResponseWriter, req *http.Request) {
 	res.Write(bytes)
 }
 
+func handleProxyWebSocketUpgrade(res http.ResponseWriter, req *http.Request) {
+	config.ProxyMessageFilter.FilterMessages = true
+	handleWebSocketUpgrade(res, req)
+}
+
 func handleWebSocketUpgrade(res http.ResponseWriter, req *http.Request) {
 	// upgrade this connection to a WebSocket
 	// connection
@@ -438,7 +461,7 @@ func handleJavascript(res http.ResponseWriter, req *http.Request) {
 	}
 
 	http.ServeFile(res, req, fp)
-	tpl.ExecuteTemplate(res, "config.gohtml", nil)
+	tpl.ExecuteTemplate(res, "config.gohtml", struct{ utils.Services }{config.Services})
 }
 
 func handleRawJSON(res http.ResponseWriter, req *http.Request) {
@@ -512,8 +535,7 @@ func wsReader() {
 				if filterId == filterId_ {
 					log.Println("Stopping Manual Filter")
 					*config.ReqFilter = filters.DefaultFilter{}
-					// create empty new filter to free up prior filter
-					// manualFilter = filters.ManualFilter{}
+					config.ProxyMessageFilter.FilterMessages = false // extra step fpr proxy filter not needed for SCIM
 				}
 				filterMutex.Unlock()
 				return
@@ -598,7 +620,7 @@ func sendUpdateToScim(url, method, msg string) error {
 	}
 
 	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 300 {
 		log.Printf("sendUpdateToScim() error: %v\n", string(body))
 		return fmt.Errorf("%q", string(body))
@@ -630,7 +652,7 @@ func getMessages(res http.ResponseWriter, req *http.Request, template string) {
 	i, _ := strconv.Atoi(start)
 	messages, totalMessages := messageLogs.GetMessages(i-1, items_per_page_messages, template)
 	// fmt.Printf("totalMessage: %v, messages: \n%+v\n", totalMessages, messages)
-	messagesTmpl := MessagessTmpl{Messages: messages}
+	messagesTmpl := MessagessTmpl{Messages: messages, Services: config.Services}
 	messagesTmpl.Count = len(messages)
 	messagesTmpl.PP = computePagePagination(current, totalMessages, items_per_page_messages)
 	messagesTmpl.Enabled = config.Server.Log_messages
@@ -730,5 +752,43 @@ func getScheme(tls *tls.ConnectionState, host string) string {
 		return "http://"
 	} else {
 		return "https://"
+	}
+}
+
+/*
+Proxy Filter
+*/
+func handleProxyFilters(res http.ResponseWriter, req *http.Request) {
+	fmt.Println("Returning Proxy Filters")
+	filterMutex.Lock()
+	manualFilter = filters.ManualFilter{Config: config, WsConn: nil, ReqMap: make(map[string]chan interface{}, 0)}
+	*config.ReqFilter = &manualFilter
+	filterId++
+	filterMutex.Unlock()
+
+	Tmpl := ProxyFilterURLsTmpl{Services: config.Services}
+	//Tmpl.URLs = []ProxyFilterURL{}
+	urls := []utils.ProxyFilterURL{}
+	for _, v := range config.ProxyMessageFilter.FilterURLs {
+		urls = append(urls, v)
+	}
+	// Tmpl.URLs = config.ProxyMessageFilter.FilterURLs
+	Tmpl.URLs = urls
+
+	// Tmpl.ResponseURLs = []ProxyFilterURL{}
+	// for _, v := range config.WebMessageFilter.
+	fmt.Println(config.ProxyMessageFilter.FilterMessages)
+	// if config.ProxyMessageFilter.FilterMessages {
+	// 	for key, value := range config.ProxyMessageFilter.FilterURLs {
+	// 		Tmpl.URLs = append(Tmpl.URLs, getProxyFilterURL(key, value))
+	// 	}
+	// 	// for key, value := range config.ProxyMessageFilter.ResponseMessages {
+	// 	// 	Tmpl.ResponseURLs = append(Tmpl.ResponseURLs, getProxyFilterURL(key, value))
+	// 	// }
+	// }
+	fmt.Printf("%+v\n", Tmpl)
+	err := tpl.ExecuteTemplate(res, "proxyfilter.gohtml", Tmpl)
+	if err != nil {
+		fmt.Printf("%+v\n", err)
 	}
 }

@@ -5,6 +5,10 @@ import (
 )
 
 type ReqFilter interface {
+	/*
+		SCIM filters
+	*/
+
 	// Filters for /scim/v2/Users {POST}
 	UserPostRequest([]byte, string) []byte
 	UserPostResponse([]byte, string) []byte
@@ -41,21 +45,26 @@ type ReqFilter interface {
 
 	// Filters for /scim/v2/Groups/<ID> {PATCH}
 	GroupsIdPatchRequest(ops *v2.PatchOp, path string)
-}
 
-type ProxyFilter interface {
-	FilterRequest(map[string][]string, []byte, string, string) (map[string][]string, []byte)
 	/*
-		-- Not needed, FilterRequest will be used for both request/response and all supported methods
-		FilterResponse(http.Header, []*http.Cookie, []byte, string) []byte
-
-		GetRequest(http.Header, []byte, string) []byte
-		GetResponse(http.Header, []byte, string) []byte
-		PostRequest(http.Header, []byte, string) []byte
-		PostResponse(http.Header, []*http.Cookie, []byte, string) []byte
-		PutRequest(http.Header, []byte, string) []byte
-		PutResponse(http.Header, []byte, string) []byte
-		OptionsRequest(http.Header, []byte, string) []byte
-		OptionsResponse(http.Header, []byte, string) []byte
+		Proxy filter
 	*/
+	FilterRequest(h map[string][]string, b []byte, path, contentType string) (map[string][]string, []byte)
 }
+
+// type ProxyFilter interface {
+// 	FilterRequest(map[string][]string, []byte, string, string) (map[string][]string, []byte)
+// 	/*
+// 		-- Not needed, FilterRequest will be used for both request/response and all supported methods
+// 		FilterResponse(http.Header, []*http.Cookie, []byte, string) []byte
+
+// 		GetRequest(http.Header, []byte, string) []byte
+// 		GetResponse(http.Header, []byte, string) []byte
+// 		PostRequest(http.Header, []byte, string) []byte
+// 		PostResponse(http.Header, []*http.Cookie, []byte, string) []byte
+// 		PutRequest(http.Header, []byte, string) []byte
+// 		PutResponse(http.Header, []byte, string) []byte
+// 		OptionsRequest(http.Header, []byte, string) []byte
+// 		OptionsResponse(http.Header, []byte, string) []byte
+// 	*/
+// }

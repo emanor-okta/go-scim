@@ -1,0 +1,42 @@
+
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head">
+  <meta charset="utf-8"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+  
+
+</head>
+
+<body>
+
+  <div class="row">
+    <div class="col-12"> 
+      <div class="container-fluid">
+        <h5 style="text-align:center">Authorize My IP {{ .MyAddress }}</h5>
+        <button type="button" class="btn btn-primary" onclick="authorizeMyIp()">Authorize</button>
+        {{/* <div>
+          <textarea style="resize:none" class="form-control" id="ssfReceiveMessageArea" name="ssfReceiveMessageArea" rows="30" cols="10" readonly></textarea>
+        </div> */}}
+      </div>
+    </div>
+
+    {{/* <div class="col-6">
+      <div class="container-fluid">
+        <iframe src="/ssf/receiver/app/embed" style="width: 100%; height: 100%"></iframe>
+      </div>
+    </div>
+  </div> */}}
+
+
+<script type="text/javascript">
+    function authorizeMyIp() {
+      window.location = '/authorizeMyIpAuthorize';
+    }
+</script>
+
+</body>
+</html>

@@ -12,6 +12,7 @@ import (
 	"github.com/emanor-okta/go-scim/filters"
 	messageLogs "github.com/emanor-okta/go-scim/server/log"
 	"github.com/emanor-okta/go-scim/server/web"
+	"github.com/emanor-okta/go-scim/types"
 	v2 "github.com/emanor-okta/go-scim/types/v2"
 	"github.com/emanor-okta/go-scim/utils"
 )
@@ -36,40 +37,75 @@ func StartServer(c *utils.Configuration) {
 	debugBody = config.Server.Debug_body
 	debugQuery = config.Server.Debug_query
 	//logMessages = config.Server.Log_messages
-	log.Printf("starting server at %v\n", config.Server.Address)
+	log.Printf("starting server [%s], listening on %v\n", config.Build, config.Server.Address)
+	configJson, _ := json.MarshalIndent(config, "", "  ")
+	fmt.Printf("Server Config:\n%v\n", string(configJson))
 
-	middlewares := []Middleware{}
+	// SCIM server specific (needs message logging)
+	scimMiddlewares := []types.Middleware{}
+	// Non SCIM (used to filter IPs)
+	commonScimMiddlewares := []types.Middleware{}
+
 	// TODO - Add different auth middlewares
-	if debugBody {
-		// used to log to console
-		middlewares = append(middlewares, getBodyMiddleware)
-	}
-	if debugHeaders {
-		// used to log to console
-		middlewares = append(middlewares, getHeadersMiddleware)
+	// if debugBody {
+	// 	// used to log to console
+	// 	scimMiddlewares = append(scimMiddlewares, getBodyMiddleware)
+	// }
+	// if debugHeaders {
+	// 	// used to log to console
+	// 	scimMiddlewares = append(scimMiddlewares, getHeadersMiddleware)
+	// }
+
+	// If filtering IPs add middleware
+	if config.Server.Filter_ips {
+		scimMiddlewares = append(scimMiddlewares, filterIpMiddleware)
+		commonScimMiddlewares = append(commonScimMiddlewares, filterIpMiddleware)
 	}
 
 	// used for logging messages to web console - Always init and add to middleware
 	messageLogs.Init()
-	middlewares = append(middlewares, logMessagesMiddleware, logMessageResponseSudoMiddleware)
+	scimMiddlewares = append(scimMiddlewares, logMessagesMiddleware, logMessageResponseSudoMiddleware)
 
-	http.HandleFunc("/goscim/scim/v2/Users", addMiddleware(handleUsers, middlewares...))
-	http.HandleFunc("/goscim/scim/v2/Users/", addMiddleware(handleUser, middlewares...))
-	http.HandleFunc("/goscim/scim/v2/Groups", addMiddleware(handleGroups, middlewares...))
-	http.HandleFunc("/goscim/scim/v2/Groups/", addMiddleware(handleGroup, middlewares...))
+	// if filtering IPs get Okta public IPs
+	if config.Server.Filter_ips {
+		config.Server.Allowed_ips = utils.GetOktaPublicIPs()
+	}
+
+	/*
+		Route Handlers defined,
+		1. here
+		2. web/webHandlers.go
+		3. web/proxyHandler.go
+	*/
+	// SCIM Server Handlers
+	if config.Services.Scim {
+		http.HandleFunc("/goscim/scim/v2/Users", utils.AddMiddleware(handleUsers, scimMiddlewares...))
+		http.HandleFunc("/goscim/scim/v2/Users/", utils.AddMiddleware(handleUser, scimMiddlewares...))
+		http.HandleFunc("/goscim/scim/v2/Groups", utils.AddMiddleware(handleGroups, scimMiddlewares...))
+		http.HandleFunc("/goscim/scim/v2/Groups/", utils.AddMiddleware(handleGroup, scimMiddlewares...))
+	}
 
 	// Mock OAuth Server Handlers
-	http.HandleFunc("/mock/oauth2/v1/authorize", handleAuthorizeReq)
-	http.HandleFunc("/mock/oauth2/v1/token", handleTokenReq)
+	http.HandleFunc("/mock/oauth2/v1/authorize", utils.AddMiddleware(handleAuthorizeReq, commonScimMiddlewares...))
+	http.HandleFunc("/mock/oauth2/v1/token", utils.AddMiddleware(handleTokenReq, commonScimMiddlewares...))
 
-	// SSF Receiver
-	http.HandleFunc("/ssf/receiver", handleSSFReq)
-	http.HandleFunc("/ssf/receiver/app", handleSSFReciever)
-	http.HandleFunc("/ssf/receiver/app/config", handleSSFRecieverConfig)
-	http.HandleFunc("/ssf/receiver/app/login", handleSSFRecieverOauthLogin)
-	http.HandleFunc("/ssf/receiver/app/callback", handleSSFRecieverOauthCallback)
-	http.HandleFunc("/ssf/receiver/app/ws", handleSSFRecieverWebSocketUpgrade)
-	http.HandleFunc("/ssf/transmitter/app", handleSSFTransmitter)
+	// SSF Receiver Handlers  (no handlers in webHandlers.go)
+	if config.Services.Ssf {
+		// config.Server.Allowed_ips["[::1]"] = "blank"
+		http.HandleFunc("/ssf/receiver", utils.AddMiddleware(handleSSFReq, commonScimMiddlewares...))
+		// http.HandleFunc("/ssf/receiver", handleSSFReq)
+		http.HandleFunc("/ssf/receiver/app", utils.AddMiddleware(handleSSFReciever, commonScimMiddlewares...))
+		http.HandleFunc("/ssf/receiver/app/embed", utils.AddMiddleware(handleSSFRecieverAppEmbed, commonScimMiddlewares...))
+		http.HandleFunc("/ssf/receiver/app/config", utils.AddMiddleware(handleSSFRecieverConfig, commonScimMiddlewares...))
+		http.HandleFunc("/ssf/receiver/app/login", utils.AddMiddleware(handleSSFRecieverOauthLogin, commonScimMiddlewares...))
+		http.HandleFunc("/ssf/receiver/app/callback", utils.AddMiddleware(handleSSFRecieverOauthCallback, commonScimMiddlewares...))
+		http.HandleFunc("/ssf/receiver/app/ws", utils.AddMiddleware(handleSSFRecieverWebSocketUpgrade, commonScimMiddlewares...))
+		http.HandleFunc("/ssf/transmitter/app", utils.AddMiddleware(handleSSFTransmitter, commonScimMiddlewares...))
+	}
+
+	// // Show Authorize page for unauthorized IP
+	// http.HandleFunc("/authorizeMyIp", handleShowAuthorizeMyIp)
+	// http.HandleFunc("/authorizeMyIpAuthorize", handleAuthorizeMyIp)
 
 	/*
 	 * Redirect testing. Currently PUT does not follow by the client
@@ -87,18 +123,18 @@ func StartServer(c *utils.Configuration) {
 		http.Redirect(res, req, strings.Replace(req.URL.RequestURI(), "/scim/v1", "/scim/v2", 1), status)
 		//return strings.Replace(req.URL.RequestURI(), "/scim/v1", "/scim/v2", 1), status
 	}
-	http.HandleFunc("/scim/v1/Users", func(res http.ResponseWriter, req *http.Request) {
+	http.HandleFunc("/scim/v1/Users", utils.AddMiddleware(func(res http.ResponseWriter, req *http.Request) {
 		handleRedirect(req, res)
-	})
-	http.HandleFunc("/scim/v1/Users/", func(res http.ResponseWriter, req *http.Request) {
+	}, commonScimMiddlewares...))
+	http.HandleFunc("/scim/v1/Users/", utils.AddMiddleware(func(res http.ResponseWriter, req *http.Request) {
 		handleRedirect(req, res)
-	})
-	http.HandleFunc("/scim/v1/Groups", func(res http.ResponseWriter, req *http.Request) {
+	}, commonScimMiddlewares...))
+	http.HandleFunc("/scim/v1/Groups", utils.AddMiddleware(func(res http.ResponseWriter, req *http.Request) {
 		handleRedirect(req, res)
-	})
-	http.HandleFunc("/scimmy/scim/v1/Groups/", func(res http.ResponseWriter, req *http.Request) {
+	}, commonScimMiddlewares...))
+	http.HandleFunc("/scimmy/scim/v1/Groups/", utils.AddMiddleware(func(res http.ResponseWriter, req *http.Request) {
 		handleRedirect(req, res)
-	})
+	}, commonScimMiddlewares...))
 	/*
 	 * end redirect testing
 	 */
@@ -111,7 +147,7 @@ func StartServer(c *utils.Configuration) {
 
 	// if running web console start it
 	if config.Server.Web_console {
-		web.StartWebServer(config)
+		web.StartWebServer(config, commonScimMiddlewares)
 	}
 
 	// if err := http.ListenAndServe(config.Server.Address, nil); err != nil {

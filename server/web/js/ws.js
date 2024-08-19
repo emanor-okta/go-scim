@@ -8,9 +8,18 @@ function intiializeWS(whichMode) {
     console.log("Attempting Connection...");
     if (window.location.protocol.includes("https")) {
         console.log("Attempting wss..");
-        socket = new WebSocket("wss://" + location.host + "/filters/ws");
+        if (whichMode === 'proxy') {
+            socket = new WebSocket("wss://" + location.host + "/filters/proxy/ws");
+        } else {
+            socket = new WebSocket("wss://" + location.host + "/filters/ws");
+        }
+
     } else {
-        socket = new WebSocket("ws://" + location.host + "/filters/ws");
+        if (whichMode === 'proxy') {
+            socket = new WebSocket("ws://" + location.host + "/filters/proxy/ws");
+        } else {
+            socket = new WebSocket("ws://" + location.host + "/filters/ws");
+        }
     }
     /*try {
         socket = new WebSocket("ws://" + location.host + "/filters/ws");

@@ -146,3 +146,10 @@ func (f DefaultFilter) GroupsIdPutResponse(b []byte, path string) []byte {
 
 func (f DefaultFilter) GroupsIdPatchRequest(ops *v2.PatchOp, path string) {
 }
+
+/*
+Proxy filter
+*/
+func (f DefaultFilter) FilterRequest(h map[string][]string, b []byte, path, contentType string) (map[string][]string, []byte) {
+	return h, b
+}

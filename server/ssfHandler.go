@@ -1,12 +1,10 @@
 package server
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -15,88 +13,13 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 
+	"github.com/emanor-okta/go-scim/types"
+	"github.com/emanor-okta/go-scim/types/ssf"
 	"github.com/emanor-okta/go-scim/utils"
 )
 
-type SecEvtTokenJWTHeader struct {
-	Kid string `json:"kid,omitempty"`
-	Typ string `json:"typ,omitempty"`
-	Alg string `json:"alg,omitempty"`
-}
-
-type Reason struct {
-	En string `json:"en,omitempty"`
-}
-
-type EvtAttributes struct {
-	Current_ip            string            `json:"current_ip,omitempty"`
-	Current_user_agent    string            `json:"current_user_agent,omitempty"`
-	Event_timestamp       int64             `json:"event_timestamp,omitempty"`
-	Initiating_entity     string            `json:"initiating_entity,omitempty"`
-	Current_level         string            `json:"current_level,omitempty"`
-	Previous_level        string            `json:"previous_level,omitempty"`
-	Current_ip_address    string            `json:"current_ip_address,omitempty"`
-	Previous_ip_address   string            `json:"previous_ip_address,omitempty"`
-	Last_known_ip         string            `json:"last_known_ip,omitempty"`
-	Last_known_user_agent string            `json:"last_known_user_agent,omitempty"`
-	New_value             string            `json:"new-value,omitempty"`
-	Reason_admin          Reason            `json:"reason_admin,omitempty"`
-	Reason_user           Reason            `json:"reason_user,omitempty"`
-	Subject               map[string]string `json:"subject,omitempty"`
-}
-
-type Events struct {
-	DeviceRiskChange struct {
-		EvtAttributes
-	} `json:"https://schemas.okta.com/secevent/okta/event-type/device-risk-change,omitempty"`
-	IpChange struct {
-		EvtAttributes
-	} `json:"https://schemas.okta.com/secevent/okta/event-type/ip-change,omitempty"`
-	UserRiskChange struct {
-		EvtAttributes
-	} `json:"https://schemas.okta.com/secevent/okta/event-type/user-risk-change,omitempty"`
-	DeviceComplianceChange struct {
-		EvtAttributes
-	} `json:"https://schemas.openid.net/secevent/caep/event-type/device-compliance-change,omitempty"`
-	SessionRevoked struct {
-		EvtAttributes
-	} `json:"https://schemas.openid.net/secevent/caep/event-type/session-revoked,omitempty"`
-	IdentifierChanged struct {
-		EvtAttributes
-	} `json:"https://schemas.openid.net/secevent/risc/event-type/identifier-changed,omitempty"`
-}
-
-type SecEvtTokenJWTBody struct {
-	Iss    string `json:"iss,omitempty"`
-	Aud    string `json:"aud,omitempty"`
-	Jti    string `json:"jti,omitempty"`
-	Iat    int64  `json:"iat,omitempty"`
-	Events Events `json:"events,omitempty"`
-}
-
-type OauthConfig struct {
-	Issuer       string `json:"issuer,omitempty"`
-	ClientId     string `json:"client_id,omitempty"`
-	ClientSecret string `json:"client_secret,omitempty"`
-	Scopes       string `json:"scopes,omitempty"`
-	RedirectURI  string `json:"redirect_url,omitempty"`
-}
-
-type TokenReponse struct {
-	AccessToken string `json:"access_token,omitempty"`
-	IdToken     string `json:"id_token,omitempty"`
-}
-
-type SsfReceiverAppData struct {
-	TokenReponse
-	OauthConfig
-	Authenticated bool
-	Username,
-	UUID string
-}
-
-const TokenCall = "client_id=%s&client_secret=%s&grant_type=authorization_code&redirect_uri=%s&code=%s"
-const AuthorizeCall = "client_id=%s&response_type=code&scope=%s&redirect_uri=%s&state=%s"
+// const TokenCall = "client_id=%s&client_secret=%s&grant_type=authorization_code&redirect_uri=%s&code=%s"
+// const AuthorizeCall = "client_id=%s&response_type=code&scope=%s&redirect_uri=%s&state=%s"
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -110,22 +33,22 @@ var (
 )
 
 var wsConn *websocket.Conn
-var oauthConfig OauthConfig
+var oauthConfig types.OauthConfig
 var tpl *template.Template
-var sessionsMap map[string]SsfReceiverAppData
+var sessionsMap map[string]ssf.SsfReceiverAppData
 
 func init() {
 	// hardcode for now
-	oauthConfig = OauthConfig{
+	oauthConfig = types.OauthConfig{
 		Issuer:       "https://emanor-oie.oktapreview.com/oauth2/default",
 		ClientId:     "0oa2cpl777xczKzL21d7",
 		ClientSecret: "Klf03TzBqEuayATkPGy7VgTqyNDKIPsIYNd9TEKo",
 		Scopes:       "openid profile email",
-		RedirectURI:  "http://localhost:8082/ssf/receiver/app/callback",
+		RedirectURI:  "http://localhost:9999/ssf/receiver/app/callback",
 	}
 
 	tpl = template.Must(template.ParseGlob("server/web/templates/*"))
-	sessionsMap = make(map[string]SsfReceiverAppData, 0)
+	sessionsMap = make(map[string]ssf.SsfReceiverAppData, 0)
 }
 
 func handleSSFReq(res http.ResponseWriter, req *http.Request) {
@@ -134,9 +57,10 @@ func handleSSFReq(res http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
 		// POST
 		b, err := getBody(req)
+		fmt.Printf("handleSSFReq: RAW JWT Received:\n%s\n", string(b))
 		if err != nil {
 			log.Printf("handleSSFReq: Error getting POST body: %v\n", err)
-			res.WriteHeader(http.StatusOK)
+			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
@@ -144,37 +68,36 @@ func handleSSFReq(res http.ResponseWriter, req *http.Request) {
 		if len(jwtParts) < 3 {
 			log.Printf("handleSSFReq: Invalid JWT Received")
 			fmt.Printf("%+v\n", jwtParts)
-			res.WriteHeader(http.StatusOK)
+			res.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		decodedHeader, _ := base64.RawStdEncoding.DecodeString(jwtParts[0])
 		decodedBody, _ := base64.RawStdEncoding.DecodeString(jwtParts[1])
-
-		var secEvtTokenJWTHeader SecEvtTokenJWTHeader
+		var secEvtTokenJWTHeader ssf.SecEvtTokenJWTHeader
 		if err := json.Unmarshal(decodedHeader, &secEvtTokenJWTHeader); err != nil {
 			log.Printf("handleSSFReq: Error decoding JWT Header: %s, err: %v\n", jwtParts[0], err)
-			res.WriteHeader(http.StatusOK)
+			res.WriteHeader(http.StatusForbidden)
 			return
 		}
 
-		var secEvtTokenJWTBody SecEvtTokenJWTBody
+		var secEvtTokenJWTBody ssf.SecEvtTokenJWTBody
 		if err := json.Unmarshal(decodedBody, &secEvtTokenJWTBody); err != nil {
 			log.Printf("handleSSFReq: Error decoding JWT Body: %s, err: %v\n", jwtParts[1], err)
-			res.WriteHeader(http.StatusOK)
+			res.WriteHeader(http.StatusForbidden)
 			return
 		}
 
 		// Verify JWT
 		key, ok := utils.GetKeyForIDFromIssuer(secEvtTokenJWTHeader.Kid, secEvtTokenJWTBody.Iss)
 		if !ok {
-			res.WriteHeader(http.StatusOK)
+			res.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		ok = utils.VerifyJwt(b, key, jwa.RS256) // Just assume RS256, don't think Okta will use anything else
 		if !ok {
-			res.WriteHeader(http.StatusOK)
+			res.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
@@ -182,32 +105,32 @@ func handleSSFReq(res http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			fmt.Println(err)
 		}
-		fmt.Printf("%s\n", part)
-		fmt.Printf("%+v\n", secEvtTokenJWTBody)
+		fmt.Printf("handleSSFReq: %s\n", part)
+		fmt.Printf("handleSSFReq: %+v\n", secEvtTokenJWTBody)
 		parseEvents(secEvtTokenJWTBody.Events)
 
-		//TESTING
+		// send to admin app to display
 		sendSSFRecieverWebSocketMessage(secEvtTokenJWTBody)
 	}
 
-	res.WriteHeader(http.StatusOK)
+	res.WriteHeader(http.StatusAccepted)
 }
 
-func parseEvents(events Events) {
+func parseEvents(events ssf.Events) {
 	if events.DeviceComplianceChange.Event_timestamp > 0 {
-
+		log.Println(" !! DeviceComplianceChange is not Supported !!")
 	}
 	if events.DeviceRiskChange.Event_timestamp > 0 {
-
+		log.Println(" !! DeviceRiskChange is not Supported !!")
 	}
 	if events.IpChange.Event_timestamp > 0 {
-
+		log.Println(" !! IpChange is not Supported !!")
 	}
 	if events.UserRiskChange.Event_timestamp > 0 {
-
+		log.Println(" !! UserRiskChange is not Supported !!")
 	}
 	if events.IdentifierChanged.Event_timestamp > 0 {
-
+		log.Println(" !! IdentifierChanged is not Supported !!")
 	}
 	if events.SessionRevoked.Event_timestamp > 0 {
 		log.Println("Received Session Revoke SecEvt")
@@ -218,8 +141,28 @@ func parseEvents(events Events) {
 				// check sessions Map for user and remove if present
 				for sessionId, sessionV := range sessionsMap {
 					if v == sessionV.UUID {
-						log.Printf("SECURITY EVENT: Session Revoked for User: %s, id: %s, removing app session\n", sessionV.Username, sessionV.UUID)
+						log.Printf("!!!!!! SECURITY EVENT !!!!!!: Session Revoked for User: %s, id: %s, removing app session\n", sessionV.Username, sessionV.UUID)
 						delete(sessionsMap, sessionId)
+					}
+				}
+			}
+		}
+	}
+	if events.CredentialChanged.Event_timestamp > 0 {
+		log.Println("Received Credential Changed SecEvt")
+		subject := events.CredentialChanged.Subject
+		if events.CredentialChanged.Change_type != "create" {
+			// change_type is "delete", "update", or "revoke"
+			for k, v := range subject {
+				fmt.Printf("subject attribute: %s, value: %s\n", k, v)
+				if k == "sub" {
+					// check sessions Map for user and remove if present
+					for k2, sessionV := range sessionsMap {
+						if v == sessionV.UUID {
+							log.Printf("!!!!!! SECURITY EVENT !!!!!!: Credential Changed for User: %s, id: %s, Force Re-Authentication\n", sessionV.Username, sessionV.UUID)
+							sessionV.ForceReAuth = true
+							sessionsMap[k2] = sessionV
+						}
 					}
 				}
 			}
@@ -228,6 +171,13 @@ func parseEvents(events Events) {
 }
 
 func handleSSFReciever(res http.ResponseWriter, req *http.Request) {
+	err := tpl.ExecuteTemplate(res, "ssfreceiver.gohtml", struct{ utils.Services }{config.Services})
+	if err != nil {
+		log.Printf("handleSSFReciever: %+v\n", err)
+	}
+}
+
+func handleSSFRecieverAppEmbed(res http.ResponseWriter, req *http.Request) {
 	fmt.Println("Returning SSF Receiver App")
 	session, _ := store.Get(req, "ssf-receiver-session")
 	fmt.Printf("handleSSFReciever values: %+v\n", session.Values)
@@ -235,8 +185,17 @@ func handleSSFReciever(res http.ResponseWriter, req *http.Request) {
 	if ok {
 		ssfReceiverAppData, ok := sessionsMap[session.Values["id"].(string)]
 		if ok {
+			// Check if Re-Auth is needed (Credential Change Event received for user)
+			if ssfReceiverAppData.ForceReAuth {
+				ssfReceiverAppData.ForceReAuth = false
+				delete(session.Values, "authenticated")
+				session.Save(req, res)
+				handleSSFRecieverOauthLoginWithExtraParams(res, req, "&prompt=login")
+				return
+			}
+
 			// Authenticated
-			err := tpl.ExecuteTemplate(res, "ssfreceiver.gohtml", ssfReceiverAppData) // just send raw token for now
+			err := tpl.ExecuteTemplate(res, "ssfreceiverAppEmbed.gohtml", ssfReceiverAppData) // just send raw token for now
 			if err != nil {
 				fmt.Printf("%+v\n", err)
 			}
@@ -244,12 +203,14 @@ func handleSSFReciever(res http.ResponseWriter, req *http.Request) {
 			log.Println("handleSSFReciever: Session Cookie set as Authenticated, but no tokenResponse in Map?, redirecting")
 			delete(session.Values, "authenticated")
 			session.Save(req, res)
-			http.Redirect(res, req, "/ssf/receiver/app", http.StatusFound)
+			http.Redirect(res, req, "/ssf/receiver/app/embed", http.StatusFound)
 		}
 	} else {
 		// Need Auth
-		ssfReceiverAppData := SsfReceiverAppData{Authenticated: false, OauthConfig: oauthConfig}
-		err := tpl.ExecuteTemplate(res, "ssfreceiver.gohtml", ssfReceiverAppData) // just send raw token for now
+		scheme := utils.GetRequestScheme(req)
+		oauthConfig.RedirectURI = fmt.Sprintf("%s://%s/ssf/receiver/app/callback", scheme, req.Host)
+		ssfReceiverAppData := ssf.SsfReceiverAppData{Authenticated: false, OauthConfig: oauthConfig}
+		err := tpl.ExecuteTemplate(res, "ssfreceiverAppEmbed.gohtml", ssfReceiverAppData)
 		if err != nil {
 			fmt.Printf("%+v\n", err)
 		}
@@ -257,7 +218,7 @@ func handleSSFReciever(res http.ResponseWriter, req *http.Request) {
 }
 
 func handleSSFTransmitter(res http.ResponseWriter, req *http.Request) {
-
+	// TODO
 }
 
 func handleSSFRecieverConfig(res http.ResponseWriter, req *http.Request) {
@@ -282,72 +243,105 @@ func handleSSFRecieverConfig(res http.ResponseWriter, req *http.Request) {
 }
 
 func handleSSFRecieverOauthLogin(res http.ResponseWriter, req *http.Request) {
+	handleSSFRecieverOauthLoginWithExtraParams(res, req, "")
+}
+
+func handleSSFRecieverOauthLoginWithExtraParams(res http.ResponseWriter, req *http.Request, extraParams string) {
+	// session, _ := store.Get(req, "ssf-receiver-session")
+	// state := utils.GenerateUUID()
+	// session.Values["state"] = state
+	// session.Save(req, res)
+	// reqParams := fmt.Sprintf(AuthorizeCall, oauthConfig.ClientId, oauthConfig.Scopes, oauthConfig.RedirectURI, state)
+	// http.Redirect(res, req, fmt.Sprintf("%s/v1/authorize?%s%s", oauthConfig.Issuer, reqParams, extraParams), http.StatusFound)
+	oauthConfig.ExtraParams = extraParams
+	utils.Authorize(res, req, oauthConfig, Callback)
+}
+
+func Callback(res http.ResponseWriter, req *http.Request, tokenResponse types.TokenReponse) {
+	id := utils.GenerateUUID()
 	session, _ := store.Get(req, "ssf-receiver-session")
-	state := utils.GenerateUUID()
-	session.Values["state"] = state
+	v, ok := session.Values["id"]
+	if ok {
+		id = v.(string)
+	}
+	session.Values["authenticated"] = true
+	session.Values["id"] = id
 	session.Save(req, res)
-	reqParams := fmt.Sprintf(AuthorizeCall, oauthConfig.ClientId, oauthConfig.Scopes, oauthConfig.RedirectURI, state)
-	http.Redirect(res, req, fmt.Sprintf("%s/v1/authorize?%s", oauthConfig.Issuer, reqParams), http.StatusFound)
+	ssfReceiverAppData := ssf.SsfReceiverAppData{TokenReponse: tokenResponse, Authenticated: true}
+	// won't validate token like with SecEvt JWT since that is main purpose
+	jwtBody, _ := base64.RawStdEncoding.DecodeString(strings.Split(tokenResponse.IdToken, ".")[1])
+	var m map[string]interface{}
+	err := json.Unmarshal(jwtBody, &m)
+	if err == nil {
+		ssfReceiverAppData.UUID = m["sub"].(string)
+		ssfReceiverAppData.Username = m["preferred_username"].(string)
+	}
+
+	sessionsMap[id] = ssfReceiverAppData
+	fmt.Printf("%+v\n", session.Values)
+	http.Redirect(res, req, "/ssf/receiver/app/embed", http.StatusFound)
 }
 
 func handleSSFRecieverOauthCallback(res http.ResponseWriter, req *http.Request) {
-	session, _ := store.Get(req, "ssf-receiver-session")
-	fmt.Printf("session: %+v\n", session)
-	state, ok := session.Values["state"]
-	if ok {
-		// Check State
-		s := req.URL.Query().Get("state")
-		c := req.URL.Query().Get("code")
-		if s == "" || s != state {
-			fmt.Println("handleSSFRecieverOauthCallback() - Need to handle no saved state, or wrong value")
-		}
-		if c == "" {
-			fmt.Println("handleSSFRecieverOauthCallback() - Need to handle no code")
-		}
-		// get Tokens
-		postBody := fmt.Sprintf(TokenCall, oauthConfig.ClientId, oauthConfig.ClientSecret, oauthConfig.RedirectURI, c)
-		req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/v1/token", oauthConfig.Issuer), bytes.NewBuffer([]byte(postBody)))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			fmt.Printf("handleSSFRecieverOauthCallback() - Token call Error: %+v\n", err)
-		}
+	utils.HandleOauthCallback(res, req)
 
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
-		if resp.StatusCode != 200 {
-			fmt.Printf("handleSSFRecieverOauthCallback() - Token call Error: %+v\n", string(body))
-			return
-		}
-		var tokenResponse TokenReponse
-		if err = json.Unmarshal(body, &tokenResponse); err != nil {
-			fmt.Printf("handleSSFRecieverOauthCallback() - Token Json parse Error: %+v\n", err)
-			return
-		}
+	// session, _ := store.Get(req, "ssf-receiver-session")
+	// fmt.Printf("session: %+v\n", session)
+	// state, ok := session.Values["state"]
+	// if ok {
+	// 	// Check State
+	// 	s := req.URL.Query().Get("state")
+	// 	c := req.URL.Query().Get("code")
+	// 	if s == "" || s != state {
+	// 		fmt.Println("handleSSFRecieverOauthCallback() - Need to handle no saved state, or wrong value")
+	// 	}
+	// 	if c == "" {
+	// 		fmt.Println("handleSSFRecieverOauthCallback() - Need to handle no code")
+	// 	}
+	// 	// get Tokens
+	// 	postBody := fmt.Sprintf(TokenCall, oauthConfig.ClientId, oauthConfig.ClientSecret, oauthConfig.RedirectURI, c)
+	// 	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/v1/token", oauthConfig.Issuer), bytes.NewBuffer([]byte(postBody)))
+	// 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	// 	client := &http.Client{}
+	// 	resp, err := client.Do(req)
+	// 	if err != nil {
+	// 		fmt.Printf("handleSSFRecieverOauthCallback() - Token call Error: %+v\n", err)
+	// 	}
 
-		session.Values["authenticated"] = true
-		id := session.Values["state"].(string)
-		session.Values["id"] = id
-		delete(session.Values, "state")
-		session.Save(req, res)
-		ssfReceiverAppData := SsfReceiverAppData{TokenReponse: tokenResponse, Authenticated: true}
-		// won't validate token like with SecEvt JWT since that is main purpose
-		jwtBody, _ := base64.RawStdEncoding.DecodeString(strings.Split(tokenResponse.IdToken, ".")[1])
-		var m map[string]interface{}
-		err = json.Unmarshal(jwtBody, &m)
-		if err == nil {
-			ssfReceiverAppData.UUID = m["sub"].(string)
-			ssfReceiverAppData.Username = m["preferred_username"].(string)
-		}
+	// 	defer resp.Body.Close()
+	// 	body, _ := io.ReadAll(resp.Body)
+	// 	if resp.StatusCode != 200 {
+	// 		fmt.Printf("handleSSFRecieverOauthCallback() - Token call Error: %+v\n", string(body))
+	// 		return
+	// 	}
+	// 	var tokenResponse types.TokenReponse
+	// 	if err = json.Unmarshal(body, &tokenResponse); err != nil {
+	// 		fmt.Printf("handleSSFRecieverOauthCallback() - Token Json parse Error: %+v\n", err)
+	// 		return
+	// 	}
 
-		sessionsMap[id] = ssfReceiverAppData
-		fmt.Printf("%+v\n", session.Values)
-		http.Redirect(res, req, "/ssf/receiver/app", http.StatusFound)
-	} else {
-		// Invalid
-		fmt.Println("handleSSFRecieverOauthCallback() - Need to handle no state")
-	}
+	// 	session.Values["authenticated"] = true
+	// 	id := session.Values["state"].(string)
+	// 	session.Values["id"] = id
+	// 	delete(session.Values, "state")
+	// 	session.Save(req, res)
+	// 	ssfReceiverAppData := ssf.SsfReceiverAppData{TokenReponse: tokenResponse, Authenticated: true}
+	// 	// won't validate token like with SecEvt JWT since that is main purpose
+	// 	jwtBody, _ := base64.RawStdEncoding.DecodeString(strings.Split(tokenResponse.IdToken, ".")[1])
+	// 	var m map[string]interface{}
+	// 	err = json.Unmarshal(jwtBody, &m)
+	// 	if err == nil {
+	// 		ssfReceiverAppData.UUID = m["sub"].(string)
+	// 		ssfReceiverAppData.Username = m["preferred_username"].(string)
+	// 	}
+
+	// 	sessionsMap[id] = ssfReceiverAppData
+	// 	fmt.Printf("%+v\n", session.Values)
+	// 	http.Redirect(res, req, "/ssf/receiver/app/embed", http.StatusFound)
+	// } else {
+	// 	// Invalid
+	// 	fmt.Println("handleSSFRecieverOauthCallback() - Need to handle no state")
+	// }
 }
 
 func handleSSFRecieverWebSocketUpgrade(res http.ResponseWriter, req *http.Request) {
