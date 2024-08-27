@@ -14,29 +14,20 @@
 <body>
 
   <div class="row">
-    <div class="col-12"> 
-      <div class="container-fluid">
-        <h5 style="text-align:center">Authorize My IP {{ .MyAddress }}</h5>
-        <button type="button" class="btn btn-primary" onclick="authorizeMyIp()">Authorize</button>
-        {{/* <div>
-          <textarea style="resize:none" class="form-control" id="ssfReceiveMessageArea" name="ssfReceiveMessageArea" rows="30" cols="10" readonly></textarea>
-        </div> */}}
-      </div>
+    <h5 style="text-align:center">Authorize My IP {{ .MyAddress }}</h5>
+  </div> 
+  <div class="row">
+    <div style="text-align:center"> 
+      <button type="button" class="btn btn-secondary" onclick="authorizeMyIp()">Authorize</button>
     </div>
-
-    {{/* <div class="col-6">
-      <div class="container-fluid">
-        <iframe src="/ssf/receiver/app/embed" style="width: 100%; height: 100%"></iframe>
-      </div>
-    </div>
-  </div> */}}
+  </div> 
 
 
-<script type="text/javascript">
-    function authorizeMyIp() {
-      window.location = '/authorizeMyIpAuthorize';
-    }
-</script>
+  <script type="text/javascript">
+      function authorizeMyIp() {
+        window.location = '/authorizeMyIpAuthorize';
+      }
+  </script>
 
 </body>
 </html>

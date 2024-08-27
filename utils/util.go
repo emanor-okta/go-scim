@@ -114,6 +114,16 @@ func GetOktaPublicIPs() map[string]string {
 	return m
 }
 
+func DebugAllowedIPs(ips map[string]string) {
+	s := "Allowed Public IPs:\n"
+	for k, v := range ips {
+		if v != "_" {
+			s = fmt.Sprintf("%s  address: %s,  user: %s\n", s, k, v)
+		}
+	}
+	fmt.Println(s)
+}
+
 func AddMiddleware(h http.HandlerFunc, m ...types.Middleware) http.HandlerFunc {
 	if len(m) < 1 {
 		return h
@@ -140,11 +150,6 @@ func Authorize(res http.ResponseWriter, req *http.Request, oauthConfig types.Oau
 }
 
 func HandleOauthCallback(res http.ResponseWriter, req *http.Request) {
-	// session, _ := store.Get(req, "ssf-receiver-session")
-	// fmt.Printf("session: %+v\n", session)
-	// state, ok := session.Values["state"]
-	// if ok {
-	// Check State
 	s := req.URL.Query().Get("state")
 	c := req.URL.Query().Get("code")
 	transactionsState := stateMap[s]
@@ -197,30 +202,6 @@ func HandleOauthCallback(res http.ResponseWriter, req *http.Request) {
 
 	// call callback with tokens
 	transactionsState.Callback(res, req, tokenResponse)
-
-	// session.Values["authenticated"] = true
-	// id := session.Values["state"].(string)
-	// session.Values["id"] = id
-	// delete(session.Values, "state")
-	// session.Save(req, res)
-	// ssfReceiverAppData := ssf.SsfReceiverAppData{TokenReponse: tokenResponse, Authenticated: true}
-	// // won't validate token like with SecEvt JWT since that is main purpose
-	// jwtBody, _ := base64.RawStdEncoding.DecodeString(strings.Split(tokenResponse.IdToken, ".")[1])
-	// var m map[string]interface{}
-	// err = json.Unmarshal(jwtBody, &m)
-	// if err == nil {
-	// 	ssfReceiverAppData.UUID = m["sub"].(string)
-	// 	ssfReceiverAppData.Username = m["preferred_username"].(string)
-	// }
-
-	// sessionsMap[id] = ssfReceiverAppData
-	// fmt.Printf("%+v\n", session.Values)
-	// http.Redirect(res, req, "/ssf/receiver/app/embed", http.StatusFound)
-
-	// } else {
-	// 	// Invalid
-	// 	fmt.Println("handleSSFRecieverOauthCallback() - Need to handle no state")
-	// }
 }
 
 /*

@@ -19,6 +19,12 @@ server:
     proxy_address: ":8084"
     filter_ips: true
     okta_public_ips_url: "https://s3.amazonaws.com/okta-ip-ranges/ip_ranges.json"
+    unauthorized_ips_oauth_config:
+        issuer: "https://emanor-oie.oktapreview.com/oauth2/ausgpm3m5e7bePhh21d7"
+        client_id: "0oagpm3efxFP4UXkw1d7"
+        client_secret: "BBfY-vATLN8b7WGZAuPkW9fd2cRLqVe1dFQbCazACmTuBIqx3L0IrHUwzCu5gyRO"
+        scopes: "openid profile email go_scim"
+        redirect_uri: "http://localhost:8082/authorizeMyIp/callback"
 scim:
     enable_groups: true
     users_endpoint: "/goscim/scim/v2/Users"

@@ -69,26 +69,15 @@ func getBodyMiddleware(h http.HandlerFunc) http.HandlerFunc {
 
 func filterIpMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// if config.Server.FilterIPs {
-		// Need to find correct way to do this, for now check X-Forwarded-For, followed by ReoteAddr
 		addr := utils.GetRemoteAddress(r)
-		// addr := r.Header.Get("X-Forwarded-For")
-		// if addr == "" {
-		// 	addr = r.RemoteAddr
-		// 	if addr != "" {
-		// 		index := strings.LastIndex(addr, ":")
-		// 		if index > -1 {
-		// 			addr = addr[0:index]
-		// 		}
-		// 	}
-		// }
-		fmt.Printf("Address: %s\n", addr)
+		fmt.Printf("Checking Address: %s\n", addr)
 		_, ok := config.Server.Allowed_ips[addr]
 		if ok {
 			h.ServeHTTP(w, r)
 		} else {
 			log.Printf("%sfilterIpMiddleware: Denying Request from %s\n", _logPrefix, addr)
-			w.WriteHeader(http.StatusForbidden)
+			// w.WriteHeader(http.StatusForbidden)
+			http.Redirect(w, r, "/authorizeMyIp", http.StatusTemporaryRedirect)
 		}
 	})
 }

@@ -10,14 +10,6 @@ import (
 // Configuration Instance
 var Config *Configuration
 
-//	type ProxyMessageFilterMethods struct {
-//		GET,
-//		POST,
-//		PUT,
-//		PATCH,
-//		OPTIONS,
-//		DELETE bool
-//	}
 type ProxyFilterURL struct {
 	URL      string `json:"url"`
 	REQUEST  bool   `json:"request"`
@@ -46,22 +38,29 @@ type Configuration struct {
 		Db       int
 	}
 	Server struct {
-		Address             string
-		Web_address         string
-		Web_console         bool
-		Debug_headers       bool
-		Debug_body          bool
-		Debug_query         bool
-		Log_messages        bool
-		Proxy_messages      bool
-		Proxy_address       string
-		Proxy_port          int
-		Proxy_origin        string
-		Proxy_sni           string
-		ProxyDisabled       bool
-		Filter_ips          bool
-		Okta_public_ips_url string
-		Allowed_ips         map[string]string
+		Address                       string
+		Web_address                   string
+		Web_console                   bool
+		Debug_headers                 bool
+		Debug_body                    bool
+		Debug_query                   bool
+		Log_messages                  bool
+		Proxy_messages                bool
+		Proxy_address                 string
+		Proxy_port                    int
+		Proxy_origin                  string
+		Proxy_sni                     string
+		ProxyDisabled                 bool
+		Filter_ips                    bool
+		Okta_public_ips_url           string
+		Allowed_ips                   map[string]string
+		Unauthorized_ips_oauth_config struct {
+			Issuer,
+			Client_id,
+			Client_secret,
+			Scopes,
+			Redirect_uri string
+		}
 	}
 	Scim struct {
 		Enable_groups     bool

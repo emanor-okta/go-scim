@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,6 +29,8 @@ import (
 const (
 	items_per_page          = 25
 	items_per_page_messages = 100
+
+	_logPrefix = "web.webHandlers."
 )
 
 var tpl *template.Template
@@ -177,7 +180,7 @@ func StartWebServer(c *utils.Configuration, mw []types.Middleware) {
 }
 
 /*
-http handlers to start OAuth for an unauthorized IP
+http handlers to start for Unauthorized IPs
 */
 func handleShowAuthorizeMyIp(res http.ResponseWriter, req *http.Request) {
 	MyAddress := utils.GetRemoteAddress(req)
@@ -190,20 +193,35 @@ func handleShowAuthorizeMyIp(res http.ResponseWriter, req *http.Request) {
 func handleAuthorizeMyIp(res http.ResponseWriter, req *http.Request) {
 	// hardcode for now
 	oauthConfig := types.OauthConfig{
-		Issuer:       "https://emanor-oie.oktapreview.com/oauth2/default",
-		ClientId:     "0oa2cpl777xczKzL21d7",
-		ClientSecret: "Klf03TzBqEuayATkPGy7VgTqyNDKIPsIYNd9TEKo",
-		Scopes:       "openid profile email",
-		RedirectURI:  "http://localhost:8082/authorizeMyIp/callback",
+		Issuer:       config.Server.Unauthorized_ips_oauth_config.Issuer,
+		ClientId:     config.Server.Unauthorized_ips_oauth_config.Client_id,
+		ClientSecret: config.Server.Unauthorized_ips_oauth_config.Client_secret,
+		Scopes:       config.Server.Unauthorized_ips_oauth_config.Scopes,
+		RedirectURI:  config.Server.Unauthorized_ips_oauth_config.Redirect_uri,
 	}
 	var callback = func(res http.ResponseWriter, req *http.Request, tokenResponse types.TokenReponse) {
 		if tokenResponse.IdToken != "" {
-			// don't check for any claim for now
-			config.Server.Allowed_ips[utils.GetRemoteAddress(req)] = "_"
-			http.Redirect(res, req, "/messages", http.StatusTemporaryRedirect)
-		} else {
-			http.Redirect(res, req, "/handleShowAuthorizeMyIp", http.StatusTemporaryRedirect)
+			_, decodeIdToken, _ := utils.GetJwtParts(tokenResponse.IdToken)
+			claims := struct {
+				Go_scim_permissions []string `json:"go_scim_permissions,omitempty"`
+				Preferred_username  string   `json:"preferred_username,omitempty"`
+			}{}
+			json.Unmarshal(decodeIdToken, &claims)
+			// fmt.Printf("%+v\n", claims)
+			if claims.Go_scim_permissions != nil {
+				if slices.Contains(claims.Go_scim_permissions, "go_scim_allow_my_ip") {
+					config.Server.Allowed_ips[utils.GetRemoteAddress(req)] = claims.Preferred_username
+					utils.DebugAllowedIPs(config.Server.Allowed_ips)
+					http.Redirect(res, req, "/messages", http.StatusTemporaryRedirect)
+					return
+				} else {
+					log.Printf("%shandleAuthorizeMyIp.callback: group go_scim_allow_my_ip not present\n", _logPrefix)
+				}
+			} else {
+				log.Printf("%shandleAuthorizeMyIp.callback: claim go_scim_allow_my_ip not present\n", _logPrefix)
+			}
 		}
+		http.Redirect(res, req, "/authorizeMyIp", http.StatusTemporaryRedirect)
 	}
 
 	utils.Authorize(res, req, oauthConfig, callback)
