@@ -21,7 +21,8 @@ type OauthTransactionState struct {
 	OauthConfig   OauthConfig
 	AuthorizeTime time.Time
 	State         string
-	Callback      func(http.ResponseWriter, *http.Request, TokenReponse)
+	// RestoreURL    string
+	Callback func(http.ResponseWriter, *http.Request, TokenReponse)
 }
 
 type TokenReponse struct {

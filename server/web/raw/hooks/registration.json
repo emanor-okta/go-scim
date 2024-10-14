@@ -1,0 +1,10 @@
+{
+    "commands": [
+        {
+            "type": "com.okta.user.profile.update",
+            "value": {
+                "login": "first.last@example.com"
+            }
+        }
+    ]
+}

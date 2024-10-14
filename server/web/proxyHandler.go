@@ -23,6 +23,7 @@ import (
 
 	"github.com/emanor-okta/go-scim/apps"
 	messageLogs "github.com/emanor-okta/go-scim/server/log"
+	"github.com/emanor-okta/go-scim/types"
 	"github.com/emanor-okta/go-scim/utils"
 	// br "github.com/google/brotli/go/cbrotli"
 )
@@ -34,10 +35,19 @@ const proxy_msg = "proxy.gohtml"
 var server *http.Server
 var proxy *httputil.ReverseProxy
 
-func init() {
-	// with default Mux can only add a specific route once so do in init() instead of startProxy()
-	// commonMiddlewares is defined/set in webHandlers.go. Should probably be moved to config.
+var publicAddress string
+
+// func init() {
+// 	// with default Mux can only add a specific route once so do in init() instead of startProxy()
+// 	// commonMiddlewares is defined/set in webHandlers.go. Should probably be moved to config.
+// 	http.HandleFunc("/", utils.AddMiddleware(handleProxy, commonMiddlewares...))
+// }
+
+func InitProxy(commonMiddlewares []types.Middleware) {
+	// init() called before commonMiddlewares had filterIP middleware, use custom Init
 	http.HandleFunc("/", utils.AddMiddleware(handleProxy, commonMiddlewares...))
+	publicAddress = utils.Config.Server.Public_address
+	publicAddress = strings.Split((strings.Split(publicAddress, "//")[1]), ":")[0]
 }
 
 func startProxy(address string, originUrl *url.URL, sni string) {
@@ -243,7 +253,8 @@ func modifyResponseImpl(res *http.Response) error {
 func handleProxy(res http.ResponseWriter, req *http.Request) {
 	// TODO - change based off of port binding - hack for now
 	if !strings.Contains(req.Host, "localhost") &&
-		!strings.Contains(req.Host, "gw.oktamanor.net") &&
+		// !strings.Contains(req.Host, "gw.oktamanor.net") &&
+		!strings.Contains(req.Host, publicAddress) &&
 		!strings.Contains(req.Host, "okta.com") &&
 		!strings.Contains(req.Host, "oktapreview.com") {
 		apps.HandleApprouting(res, req, strings.Split(req.Host, ".")[0])
@@ -454,9 +465,24 @@ func handleToggleProxyLogging(res http.ResponseWriter, req *http.Request) {
 	res.Write(nil)
 }
 
-func handleProxyFilterConfig(res http.ResponseWriter, req *http.Request) {
+func handleToggleProxyFilterIps(res http.ResponseWriter, req *http.Request) {
+	state, err := strconv.ParseBool(req.URL.Query().Get("enabled"))
+	if err != nil {
+		log.Printf("handleToggleProxyFilterIps.ParseBool() failed: %v\n", err)
+		res.WriteHeader(400)
+		res.Write(nil)
+		return
+	}
 
+	log.Printf("Setting Proxy Filter IPs to %v\n", state)
+	config.Server.ProxyFilterIps = state
+	res.WriteHeader(200)
+	res.Write(nil)
 }
+
+// func handleProxyFilterConfig(res http.ResponseWriter, req *http.Request) {
+
+// }
 
 func handleProxyMessages(res http.ResponseWriter, req *http.Request) {
 	fmt.Println("Returning Proxy Messages")

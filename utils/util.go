@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -15,6 +16,8 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+
+	"github.com/gorilla/websocket"
 
 	"github.com/emanor-okta/go-scim/types"
 	"github.com/google/uuid"
@@ -79,8 +82,19 @@ func GetRemoteAddress(r *http.Request) string {
 			}
 		}
 	}
-
+	// fmt.Printf("X-Forwarded-For: %s, RemoteAddr: %s\n", r.Header.Get("X-Forwarded-For"), r.RemoteAddr)
 	return addr
+}
+
+func GetBody(req *http.Request) ([]byte, error) {
+	b, err := io.ReadAll(req.Body)
+	if err != nil {
+		log.Printf("%sGetBody: Error reading Json Data: %v\n", _logPrefix, err)
+		return nil, err
+	}
+
+	defer req.Body.Close()
+	return b, nil
 }
 
 func GetOktaPublicIPs() map[string]string {
@@ -111,6 +125,12 @@ func GetOktaPublicIPs() map[string]string {
 	// for k, v := range m {
 	// 	fmt.Printf("%s : %s\n", k, v)
 	// }
+	// localIps := GetLocalIps()
+	// for _, ip_ := range localIps {
+	// 	m[ip_] = "local-server-ip"
+	// }
+
+	// DebugAllowedIPs(m)
 	return m
 }
 
@@ -122,6 +142,55 @@ func DebugAllowedIPs(ips map[string]string) {
 		}
 	}
 	fmt.Println(s)
+}
+
+func GetLocalIps() []string {
+	ips := []string{}
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		log.Printf("%sGetLocalIps: Error getting interfaces %s\n", _logPrefix, err)
+		return ips
+	}
+
+	for _, i := range ifaces {
+		addrs, err := i.Addrs()
+		if err != nil {
+			log.Printf("%sGetLocalIps: Error getting address %s\n", _logPrefix, err)
+			continue
+		}
+
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+
+			if !ip.IsLoopback() {
+				ips = append(ips, ip.String())
+			}
+		}
+	}
+
+	// Get outbound IP when connecting to gw.oktamanor.net
+	conn, err := net.Dial("udp", "gw.oktamanor.net:8443")
+	if err != nil {
+		log.Fatal(err)
+	} else {
+		defer conn.Close()
+		localAddr := conn.LocalAddr().(*net.UDPAddr)
+		localIp := localAddr.IP.String()
+		index := strings.LastIndex(localIp, ":")
+		if index > -1 {
+			localIp = localIp[0:index]
+		}
+		fmt.Println(localIp)
+		ips = append(ips, localIp)
+	}
+
+	return ips
 }
 
 func AddMiddleware(h http.HandlerFunc, m ...types.Middleware) http.HandlerFunc {
@@ -145,6 +214,7 @@ func Authorize(res http.ResponseWriter, req *http.Request, oauthConfig types.Oau
 	now := time.Now()
 	oauthTransactionState := types.OauthTransactionState{OauthConfig: oauthConfig, State: state, AuthorizeTime: now, Callback: callback}
 	stateMap[state] = oauthTransactionState
+	// fmt.Printf("%+v\n", stateMap)
 	reqParams := fmt.Sprintf(authorizeCall, oauthConfig.ClientId, oauthConfig.Scopes, oauthConfig.RedirectURI, state)
 	http.Redirect(res, req, fmt.Sprintf("%s/v1/authorize?%s%s", oauthConfig.Issuer, reqParams, oauthConfig.ExtraParams), http.StatusFound)
 }
@@ -153,7 +223,9 @@ func HandleOauthCallback(res http.ResponseWriter, req *http.Request) {
 	s := req.URL.Query().Get("state")
 	c := req.URL.Query().Get("code")
 	transactionsState := stateMap[s]
+	// fmt.Printf("%+v\n", stateMap)
 	delete(stateMap, s)
+	// fmt.Printf("%+v\n", transactionsState)
 	if s == "" || s != transactionsState.State {
 		fmt.Printf("%shandleOauthCallback() - Need to handle no saved state, or wrong value\n", _logPrefix)
 	}
@@ -167,18 +239,18 @@ func HandleOauthCallback(res http.ResponseWriter, req *http.Request) {
 	client := &http.Client{}
 	tokenRes, err := client.Do(tokenReq)
 	if err != nil {
-		fmt.Printf("%shandleSSFRecieverOauthCallback() - Token call Error: %+v\n", _logPrefix, err)
+		fmt.Printf("%sHandleOauthCallback() - Token call Error: %+v\n", _logPrefix, err)
 	}
 
 	defer tokenRes.Body.Close()
 	body, _ := io.ReadAll(tokenRes.Body)
 	if tokenRes.StatusCode != 200 {
-		fmt.Printf("%shandleSSFRecieverOauthCallback() - Token call Error: %+v\n", _logPrefix, string(body))
+		fmt.Printf("%sHandleOauthCallback() - Token call Error: %+v\n", _logPrefix, string(body))
 		return
 	}
 	var tokenResponse types.TokenReponse
 	if err = json.Unmarshal(body, &tokenResponse); err != nil {
-		fmt.Printf("%shandleSSFRecieverOauthCallback() - Token Json parse Error: %+v\n", _logPrefix, err)
+		fmt.Printf("%sHandleOauthCallback() - Token Json parse Error: %+v\n", _logPrefix, err)
 		return
 	}
 
@@ -254,4 +326,54 @@ func VerifyJwt(jwtBytes []byte, key jwk.Key, alg jwa.KeyAlgorithm) bool {
 	}
 
 	return true
+}
+
+/*
+WS Utils
+*/
+func HandleWebSocketUpgrade(res http.ResponseWriter, req *http.Request, wsClientConnected *bool) *websocket.Conn {
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     nil, //func(r *http.Request) bool { return true },
+	}
+	// upgrade this connection to a WebSocket connection
+	conn, err := upgrader.Upgrade(res, req, nil)
+	if err != nil {
+		log.Printf("upgrader.Upgrade() err: %v\n", err)
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write(nil)
+		return nil
+	}
+
+	// wsConn = conn
+	log.Println("Web Socket Client Connected")
+	*wsClientConnected = true
+	return conn
+	// listen indefinitely for new messages coming
+	// through on our WebSocket connection
+	// go wsReader()
+}
+
+/*
+Used only for Ping to keep WS open
+*/
+func WsPingOnlyReader(wsConn *websocket.Conn, wsClientConnected *bool) {
+	for {
+		// read in a message
+		log.Println("handle WebSocket Reader about to block for Message")
+		var m interface{}
+		err := wsConn.ReadJSON(&m)
+		if err != nil {
+			log.Printf("handle wsConn.ReadJSON error: %v\n", err)
+			if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Println("handleSSFReciever wsConn.ReadJSON Client Disconnected")
+				*wsClientConnected = false
+				return
+			}
+			continue
+		}
+
+		// fmt.Printf("handleSSFReciever message: %+v\n", m)
+	}
 }

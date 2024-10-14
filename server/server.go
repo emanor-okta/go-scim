@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/emanor-okta/go-scim/filters"
+	"github.com/emanor-okta/go-scim/server/handlers"
 	messageLogs "github.com/emanor-okta/go-scim/server/log"
 	"github.com/emanor-okta/go-scim/server/web"
 	"github.com/emanor-okta/go-scim/types"
@@ -45,6 +46,8 @@ func StartServer(c *utils.Configuration) {
 	scimMiddlewares := []types.Middleware{}
 	// Non SCIM (used to filter IPs)
 	commonScimMiddlewares := []types.Middleware{}
+	// Used for Proxy only
+	proxyMiddlewares := []types.Middleware{}
 
 	// TODO - Add different auth middlewares
 	// if debugBody {
@@ -62,14 +65,15 @@ func StartServer(c *utils.Configuration) {
 		commonScimMiddlewares = append(commonScimMiddlewares, filterIpMiddleware)
 	}
 
+	// Always Init Proxy with filterIpMiddleware
+	proxyMiddlewares = append(proxyMiddlewares, filterProxyIpMiddleware)
+	web.InitProxy(proxyMiddlewares)
+
 	// used for logging messages to web console - Always init and add to middleware
 	messageLogs.Init()
 	scimMiddlewares = append(scimMiddlewares, logMessagesMiddleware, logMessageResponseSudoMiddleware)
 
-	// if filtering IPs get Okta public IPs
-	if config.Server.Filter_ips {
-		config.Server.Allowed_ips = utils.GetOktaPublicIPs()
-	}
+	c.CommonScimMiddlewares = commonScimMiddlewares
 
 	/*
 		Route Handlers defined,
@@ -83,6 +87,13 @@ func StartServer(c *utils.Configuration) {
 		http.HandleFunc("/goscim/scim/v2/Users/", utils.AddMiddleware(handleUser, scimMiddlewares...))
 		http.HandleFunc("/goscim/scim/v2/Groups", utils.AddMiddleware(handleGroups, scimMiddlewares...))
 		http.HandleFunc("/goscim/scim/v2/Groups/", utils.AddMiddleware(handleGroup, scimMiddlewares...))
+		http.HandleFunc("/goscim/scim/v2/ServiceProviderConfig", utils.AddMiddleware(handleServiceProviderConfig, scimMiddlewares...))
+		// hack for OPP
+		// http.HandleFunc("/goscim/v2/scim/Users", utils.AddMiddleware(handleUsers, scimMiddlewares...))
+		// http.HandleFunc("/goscim/v2/scim/Users/", utils.AddMiddleware(handleUser, scimMiddlewares...))
+		// http.HandleFunc("/goscim/v2/scim/Groups", utils.AddMiddleware(handleGroups, scimMiddlewares...))
+		// http.HandleFunc("/goscim/v2/scim/Groups/", utils.AddMiddleware(handleGroup, scimMiddlewares...))
+		// http.HandleFunc("/goscim/v2/scim/ServiceProviderConfig", utils.AddMiddleware(handleServiceProviderConfig, scimMiddlewares...))
 	}
 
 	// Mock OAuth Server Handlers
@@ -101,6 +112,27 @@ func StartServer(c *utils.Configuration) {
 		http.HandleFunc("/ssf/receiver/app/callback", utils.AddMiddleware(handleSSFRecieverOauthCallback, commonScimMiddlewares...))
 		http.HandleFunc("/ssf/receiver/app/ws", utils.AddMiddleware(handleSSFRecieverWebSocketUpgrade, commonScimMiddlewares...))
 		http.HandleFunc("/ssf/transmitter/app", utils.AddMiddleware(handleSSFTransmitter, commonScimMiddlewares...))
+	}
+
+	// Hooks Handlers (no handlers in webHandlers.go)
+	if config.Services.Hooks {
+		http.HandleFunc("/hooks/service", utils.AddMiddleware(handlers.HandleHookRequest, utils.Config.CommonScimMiddlewares...))
+		http.HandleFunc("/hooks/inline", utils.AddMiddleware(handlers.HandleInlineHookRequest, utils.Config.CommonScimMiddlewares...))
+		http.HandleFunc("/hooks/inline/ws", utils.AddMiddleware(handlers.HandleHookWebSocketUpgrade, utils.Config.CommonScimMiddlewares...))
+		http.HandleFunc("/hooks/inline/config", utils.AddMiddleware(handlers.HandleHookConfig, utils.Config.CommonScimMiddlewares...))
+		handlers.LoadDefaultResponses()
+	}
+
+	// DPoP / JWT Handlers (no handlers in webHandlers.go)
+	if config.Services.Dpop {
+		http.HandleFunc("/dpop/callback", utils.AddMiddleware(handlers.HandleCallbackReq, utils.Config.CommonScimMiddlewares...))
+		http.HandleFunc("/dpop/generate_dpop", utils.AddMiddleware(handlers.HandleGenerateDpop, utils.Config.CommonScimMiddlewares...))
+		http.HandleFunc("/dpop", utils.AddMiddleware(handlers.HandleDpop, utils.Config.CommonScimMiddlewares...))
+		http.HandleFunc("/dpop/upload_priv_key", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
+		http.HandleFunc("/dpop/upload_dpop_key", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
+		http.HandleFunc("/dpop/jwt-config", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
+		http.HandleFunc("/dpop/m2m-config", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
+		http.HandleFunc("/dpop/web-config", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
 	}
 
 	// // Show Authorize page for unauthorized IP
@@ -172,10 +204,65 @@ func StartServer(c *utils.Configuration) {
 		// MaxHeaderBytes: 1 << 20,
 		ConnState: f,
 	}
-	log.Fatal(s.ListenAndServe())
-	if err := s.ListenAndServe(); err != nil {
-		log.Fatalf("Server startup failed: %s\n", err)
+	// log.Fatal(s.ListenAndServe())
+	// if err := s.ListenAndServe(); err != nil {
+	// 	log.Fatalf("Server startup failed: %s\n", err)
+	// }
+	ch := make(chan int)
+	go listen(s, ch)
+
+	// if filtering IPs get Okta public IPs and local IPs (calls made to self)
+	if config.Server.Filter_ips {
+		addAllowedIps()
 	}
+
+	exit := <-ch
+	log.Printf("Server shutting down: %v\n", exit)
+}
+
+func listen(s *http.Server, ch chan int) {
+	if err := s.ListenAndServe(); err != nil {
+		log.Printf("Server stopped: %s\n", err)
+		ch <- 0
+	}
+}
+
+func addAllowedIps() {
+	config.Server.Allowed_ips = utils.GetOktaPublicIPs()
+	// Get local IPs
+	localIps := utils.GetLocalIps()
+	for _, ip_ := range localIps {
+		config.Server.Allowed_ips[ip_] = "local-server-ip"
+	}
+	/*
+		having issues getting the actual IP that will be shown as x-forwarded or remoteAddress when running
+		in Docker on AWS. Use below workaround for now
+	*/
+	whoAmIId := utils.GenerateUUID()
+	http.HandleFunc("/whoami", func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("whoAmIId")
+		fmt.Printf("%s = %s\n", id, whoAmIId)
+		if id == whoAmIId {
+			config.Server.Allowed_ips[utils.GetRemoteAddress(r)] = "whoami-ip"
+			for i := 0; i < 10; i++ {
+				whoAmIId = fmt.Sprintf("%s%s", whoAmIId, utils.GenerateUUID())
+			}
+			w.WriteHeader(http.StatusOK)
+		} else {
+			http.Redirect(w, r, "/messages", http.StatusTemporaryRedirect)
+		}
+	})
+
+	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/whoami?whoAmIId=%s", config.Server.Public_address, whoAmIId), nil)
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err == nil {
+		defer res.Body.Close()
+	} else {
+		log.Printf("server.server.StartServer(): Error calling /whoami, %+v\n", err)
+	}
+
+	utils.DebugAllowedIPs(config.Server.Allowed_ips)
 }
 
 // TESTING - how Okta handled a SCIM server 302 all requests

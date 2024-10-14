@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/emanor-okta/go-scim/types"
 )
 
 // Configuration Instance
@@ -25,20 +27,55 @@ type ProxyFilterURL struct {
 type Services struct {
 	Scim,
 	Proxy,
-	Ssf bool
+	Hooks,
+	Ssf,
+	Dpop bool
+}
+
+type Hooks struct {
+	FilterHooks bool
+	AutoRespond bool
+	Token,
+	Saml,
+	Password,
+	Registration,
+	Telephony,
+	UserImport string
+}
+
+type Dpop struct {
+	FlowType,
+	Issuer,
+	Code,
+	CodeVerifier,
+	RedirectURI,
+	ClientId,
+	ClientSecret,
+	AssertPem,
+	AssertKid,
+	DpopPem,
+	Port,
+	ApiEndpoint,
+	ApiMethod,
+	Scopes string
+	DebugNet bool
 }
 
 type Configuration struct {
 	Build     string
 	ReqFilter *ReqFilter
 	Services
-	Redis struct {
+	Hooks
+	Dpop
+	CommonScimMiddlewares []types.Middleware
+	Redis                 struct {
 		Address  string
 		Password string
 		Db       int
 	}
 	Server struct {
 		Address                       string
+		Public_address                string
 		Web_address                   string
 		Web_console                   bool
 		Debug_headers                 bool
@@ -51,6 +88,7 @@ type Configuration struct {
 		Proxy_origin                  string
 		Proxy_sni                     string
 		ProxyDisabled                 bool
+		ProxyFilterIps                bool
 		Filter_ips                    bool
 		Okta_public_ips_url           string
 		Allowed_ips                   map[string]string
@@ -115,8 +153,11 @@ func LoadConfig(c string) *Configuration {
 	// config.ProxyMessageFilter.ResponseMessages = make(map[string]ProxyMessageFilterMethods)
 	// config.ProxyMessageFilter.FilterURLs = make(map[string]map[string]bool)
 	config.ProxyMessageFilter.FilterURLs = make(map[string]ProxyFilterURL)
-
 	config.ProxyMessageFilter.FilterMessages = false
+
+	config.Hooks = Hooks{}
+
+	// config.Server.ProxyFilterIps = true
 
 	//TEST
 	// config.ProxyMessageFilter.FilterMessages = true

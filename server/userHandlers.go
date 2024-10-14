@@ -290,3 +290,54 @@ func writeCompressedResponse(w http.ResponseWriter, body any) {
 	defer gw.Close()
 	json.NewEncoder(gw).Encode(body)
 }
+
+func handleServiceProviderConfig(res http.ResponseWriter, req *http.Request) {
+	test := `
+	{
+  "schemas":[
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:okta:schemas:scim:providerconfig:2.0"
+  ],
+  "documentationUrl":"https://support.okta.com/scim-fake-page.html",
+  "patch":{
+    "supported":true
+  },
+  "bulk":{
+    "supported":false
+  },
+  "filter":{
+    "supported":true,
+    "maxResults":100
+  },
+  "changePassword":{
+    "supported":true
+  },
+  "sort":{
+    "supported":false
+  },
+  "etag":{
+    "supported":false
+  },
+  "authenticationSchemes":[
+  ],
+  "urn:okta:schemas:scim:providerconfig:2.0":{
+    "userManagementCapabilities":[
+      "GROUP_PUSH",
+      "IMPORT_NEW_USERS",
+      "IMPORT_PROFILE_UPDATES",
+      "PUSH_NEW_USERS",
+      "PUSH_PASSWORD_UPDATES",
+      "PUSH_PENDING_USERS",
+      "PUSH_PROFILE_UPDATES",
+      "PUSH_USER_DEACTIVATION",
+      "REACTIVATE_USERS"
+    ]
+  }
+}
+  `
+	res.Header().Add("content-type", content_type)
+	_, err := res.Write([]byte(test))
+	if err != nil {
+		log.Printf("handleServiceProviderConfig error: %s\n", err)
+	}
+}

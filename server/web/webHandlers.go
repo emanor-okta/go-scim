@@ -92,6 +92,7 @@ type MessagessTmpl struct {
 	Error              error
 	Enabled            bool
 	ProxyEnabled       bool
+	ProxyFilterIps     bool
 	ProxyPort          int
 	ProxyOrigin        string
 	SNI                string
@@ -125,7 +126,6 @@ func StartWebServer(c *utils.Configuration, mw []types.Middleware) {
 		http.HandleFunc("/groups/update", utils.AddMiddleware(handleUpdateGroup, commonMiddlewares...))
 		http.HandleFunc("/groups/delete", utils.AddMiddleware(handleDeleteGroup, commonMiddlewares...))
 		http.HandleFunc("/filters/ws", utils.AddMiddleware(handleWebSocketUpgrade, commonMiddlewares...))
-		http.HandleFunc("/filters/proxy/ws", utils.AddMiddleware(handleProxyWebSocketUpgrade, commonMiddlewares...))
 		http.HandleFunc("/filters", utils.AddMiddleware(handleFilters, commonMiddlewares...))
 		http.HandleFunc("/filters/toggle", utils.AddMiddleware(handleToggleFilter, commonMiddlewares...))
 		http.HandleFunc("/redis/flush", utils.AddMiddleware(handleFlush, commonMiddlewares...))
@@ -137,10 +137,20 @@ func StartWebServer(c *utils.Configuration, mw []types.Middleware) {
 		http.HandleFunc("/proxyfilter", utils.AddMiddleware(handleProxyFilters, commonMiddlewares...))
 		http.HandleFunc("/proxyfilter/toggle", utils.AddMiddleware(handleProxyToggleFilter, commonMiddlewares...))
 		http.HandleFunc("/proxy/toggle", utils.AddMiddleware(handleToggleProxyLogging, commonMiddlewares...))
+		http.HandleFunc("/proxy/filterIPsToggle", utils.AddMiddleware(handleToggleProxyFilterIps, commonMiddlewares...))
+		http.HandleFunc("/filters/proxy/ws", utils.AddMiddleware(handleProxyWebSocketUpgrade, commonMiddlewares...))
 	}
 	if c.Services.Proxy || c.Services.Scim {
 		http.HandleFunc("/messages/flush", utils.AddMiddleware(handleFlush, commonMiddlewares...))
 	}
+	// if c.Services.Hooks {
+	// http.HandleFunc("/raw/hooks/token.json", utils.AddMiddleware(handleRawJSON, commonMiddlewares...))
+	// http.HandleFunc("/raw/hooks/import.json", utils.AddMiddleware(handleRawJSON, commonMiddlewares...))
+	// http.HandleFunc("/raw/hooks/password.json", utils.AddMiddleware(handleRawJSON, commonMiddlewares...))
+	// http.HandleFunc("/raw/hooks/registration.json", utils.AddMiddleware(handleRawJSON, commonMiddlewares...))
+	// http.HandleFunc("/raw/hooks/saml.json", utils.AddMiddleware(handleRawJSON, commonMiddlewares...))
+	// http.HandleFunc("/raw/hooks/telephony.json", utils.AddMiddleware(handleRawJSON, commonMiddlewares...))
+	// }
 
 	http.HandleFunc("/js/ws.js", utils.AddMiddleware(handleJavascript, commonMiddlewares...))
 	http.HandleFunc("/js/ui.js", utils.AddMiddleware(handleJavascript, commonMiddlewares...))
@@ -185,8 +195,9 @@ http handlers to start for Unauthorized IPs
 func handleShowAuthorizeMyIp(res http.ResponseWriter, req *http.Request) {
 	MyAddress := utils.GetRemoteAddress(req)
 	Payload := struct {
-		MyAddress string
-	}{MyAddress: MyAddress}
+		MyAddress  string
+		RestoreUrl string
+	}{MyAddress: MyAddress, RestoreUrl: req.URL.Query().Get("restore-url")}
 	tpl.ExecuteTemplate(res, "authorizeMyIp.gohtml", Payload)
 }
 
@@ -199,6 +210,8 @@ func handleAuthorizeMyIp(res http.ResponseWriter, req *http.Request) {
 		Scopes:       config.Server.Unauthorized_ips_oauth_config.Scopes,
 		RedirectURI:  config.Server.Unauthorized_ips_oauth_config.Redirect_uri,
 	}
+	// restoreUrl := req.URL.RequestURI()
+	restoreUrl := req.URL.Query().Get("restore-url")
 	var callback = func(res http.ResponseWriter, req *http.Request, tokenResponse types.TokenReponse) {
 		if tokenResponse.IdToken != "" {
 			_, decodeIdToken, _ := utils.GetJwtParts(tokenResponse.IdToken)
@@ -212,7 +225,7 @@ func handleAuthorizeMyIp(res http.ResponseWriter, req *http.Request) {
 				if slices.Contains(claims.Go_scim_permissions, "go_scim_allow_my_ip") {
 					config.Server.Allowed_ips[utils.GetRemoteAddress(req)] = claims.Preferred_username
 					utils.DebugAllowedIPs(config.Server.Allowed_ips)
-					http.Redirect(res, req, "/messages", http.StatusTemporaryRedirect)
+					http.Redirect(res, req, restoreUrl, http.StatusTemporaryRedirect)
 					return
 				} else {
 					log.Printf("%shandleAuthorizeMyIp.callback: group go_scim_allow_my_ip not present\n", _logPrefix)
@@ -483,17 +496,17 @@ func handleJavascript(res http.ResponseWriter, req *http.Request) {
 }
 
 func handleRawJSON(res http.ResponseWriter, req *http.Request) {
-	//fmt.Println(req.URL.Path)
 	res.Header().Set("Content-Type", "application/json")
-	var fp string
-	if req.URL.Path == "/raw/user.json" {
-		fp = path.Join("server", "web", "raw", "user.json")
-	} else {
-		fp = path.Join("server", "web", "raw", "group.json")
-	}
 
-	http.ServeFile(res, req, fp)
-	//tpl.ExecuteTemplate(res, "config.gohtml", nil)
+	// var fp string
+	// if req.URL.Path == "/raw/user.json" {
+	// 	fp = path.Join("server", "web", "raw", "user.json")
+	// } else {
+	// 	fp = path.Join("server", "web", "raw", "group.json")
+	// }
+	// http.ServeFile(res, req, fp)
+
+	http.ServeFile(res, req, fmt.Sprintf("server/web%s", req.URL.Path))
 }
 
 func handleToggleFilter(res http.ResponseWriter, req *http.Request) {
@@ -675,6 +688,7 @@ func getMessages(res http.ResponseWriter, req *http.Request, template string) {
 	messagesTmpl.PP = computePagePagination(current, totalMessages, items_per_page_messages)
 	messagesTmpl.Enabled = config.Server.Log_messages
 	messagesTmpl.ProxyEnabled = config.Server.Proxy_messages
+	messagesTmpl.ProxyFilterIps = config.Server.ProxyFilterIps
 	messagesTmpl.ProxyPort = config.Server.Proxy_port
 	messagesTmpl.ProxyOrigin = config.Server.Proxy_origin
 	messagesTmpl.SNI = config.Server.Proxy_sni

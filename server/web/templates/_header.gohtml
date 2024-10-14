@@ -53,7 +53,7 @@
         {{if .Services.Proxy}}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            GW / Reverse Proxy
+            Gateway
           </a>
           <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
             <li><a class="dropdown-item" href="/proxy">Configuration / Messages</a></li>
@@ -72,9 +72,16 @@
           </ul>
         </li>
         {{end}}
-        {{/* <li class="nav-item">
-          <a class="nav-link" href="/proxy">Reverse Proxy</a>
-        </li> */}}
+        {{if .Services.Hooks}}
+        <li class="nav-item">
+          <a class="nav-link" href="/hooks/inline">Hooks</a>
+        </li>
+        {{end}}    
+        {{if .Services.Dpop}}
+        <li class="nav-item">
+          <a class="nav-link" href="/dpop">DPoP/JWT</a>
+        </li>
+        {{end}}     
       </ul>
       <form class="d-flex">
         {{if or (.Services.Scim) (.Services.Proxy)}}

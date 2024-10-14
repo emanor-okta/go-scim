@@ -6,7 +6,7 @@
 
 #docker run --publish 8082:8082 docker-go-scim
 
-FROM golang:1.20
+FROM golang:1.23
 
 # Set destination for COPY
 WORKDIR /app

@@ -25,7 +25,7 @@
 
   <script type="text/javascript">
       function authorizeMyIp() {
-        window.location = '/authorizeMyIpAuthorize';
+        window.location = '/authorizeMyIpAuthorize?restore-url=' + {{ .RestoreUrl }};
       }
   </script>
 

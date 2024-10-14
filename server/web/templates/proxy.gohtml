@@ -20,7 +20,7 @@
             <input type="text" id="SNI" class="form-control" {{if (ne .SNI $emptyOrigin)}}value="{{.SNI}}"{{else}}placeholder="<sni_domain_name>"{{end}} {{if .ProxyEnabled}}disabled{{end}}>
           </div>
    
-      <div class="col-2">
+      {{/* <div class="col-2">
         <select class="form-select" aria-label="No Auto Refresh" id="AutoRefresh">
           <option selected>Auto Refresh Off</option>
           <option value="5">5 seconds</option>
@@ -28,7 +28,15 @@
           <option value="30">30 seconds</option>
           <option value="60">60 seconds</option>
         </select>
+      </div> */}}
+
+
+      <div class="form-check form-switch col-2">
+          <input class="form-check-input" type="checkbox" id="ProxyFilterIps" onclick="proxyFilterIpsToggled()" {{if .ProxyFilterIps}}checked{{end}}>
+          <label class="form-check-label" for="ProxyLogMessages">Filter IPs</label>
       </div>
+
+      
 
     </div>
   
@@ -122,8 +130,8 @@
 
 
 <script>
-  document.getElementById('AutoRefresh').addEventListener("change", refreshMessages);
-  startRefresh();
+  //document.getElementById('AutoRefresh').addEventListener("change", refreshMessages);
+  //startRefresh();
 </script>
 
 {{template "footer"}}

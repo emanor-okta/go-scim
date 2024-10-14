@@ -85,6 +85,25 @@ function logProxyMessagesToggled() {
   });
 }
 
+function proxyFilterIpsToggled() {
+  var checkBox = document.getElementById('ProxyFilterIps');
+  fetch(location.origin + '/proxy/filterIPsToggle?enabled='+checkBox.checked)
+  .then(response => {
+    console.log(response);
+    if (!response.ok) {
+      response.json()
+      .then(data => {
+        alert('Failed to change proxy filter IPs to ' + checkBox.checked + '\nError: ' + data["error"]);
+      });
+      checkBox.checked = !checkBox.checked;
+    }
+  }).catch(err => {
+    console.log(err);
+    alert('Failed to change proxy filter IPs to ' + checkBox.checked + ', error: ' + err);
+    checkBox.checked = !checkBox.checked;
+  });
+}
+
 function updateUser(id) {
   var userId = document.getElementById('id-'+id).value;
   var msg = document.getElementById('messageArea-'+id).value;
@@ -158,7 +177,7 @@ function fetchTemplateData(url, element) {
     response.json()
     .then(data => {
       console.log(JSON.stringify(data, null, "  "));
-      element.textContent = JSON.stringify(data, null, "  ");
+      element.value = JSON.stringify(data, null, "  ");
     });
   }).catch(err => {
     console.log(err);

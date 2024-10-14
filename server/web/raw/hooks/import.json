@@ -1,0 +1,9 @@
+{
+    "commands": [{
+      "type": "com.okta.appUser.profile.update",
+      "value": {
+        "firstName": "Stan",
+        "lastName": "Lee"
+      }
+    }]
+  }

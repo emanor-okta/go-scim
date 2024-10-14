@@ -33,6 +33,7 @@ var (
 )
 
 var wsConn *websocket.Conn
+var wsClientConnected bool
 var oauthConfig types.OauthConfig
 var tpl *template.Template
 var sessionsMap map[string]ssf.SsfReceiverAppData
@@ -49,6 +50,7 @@ func init() {
 
 	tpl = template.Must(template.ParseGlob("server/web/templates/*"))
 	sessionsMap = make(map[string]ssf.SsfReceiverAppData, 0)
+	wsClientConnected = false
 }
 
 func handleSSFReq(res http.ResponseWriter, req *http.Request) {
@@ -247,12 +249,6 @@ func handleSSFRecieverOauthLogin(res http.ResponseWriter, req *http.Request) {
 }
 
 func handleSSFRecieverOauthLoginWithExtraParams(res http.ResponseWriter, req *http.Request, extraParams string) {
-	// session, _ := store.Get(req, "ssf-receiver-session")
-	// state := utils.GenerateUUID()
-	// session.Values["state"] = state
-	// session.Save(req, res)
-	// reqParams := fmt.Sprintf(AuthorizeCall, oauthConfig.ClientId, oauthConfig.Scopes, oauthConfig.RedirectURI, state)
-	// http.Redirect(res, req, fmt.Sprintf("%s/v1/authorize?%s%s", oauthConfig.Issuer, reqParams, extraParams), http.StatusFound)
 	oauthConfig.ExtraParams = extraParams
 	utils.Authorize(res, req, oauthConfig, Callback)
 }
@@ -284,66 +280,11 @@ func Callback(res http.ResponseWriter, req *http.Request, tokenResponse types.To
 
 func handleSSFRecieverOauthCallback(res http.ResponseWriter, req *http.Request) {
 	utils.HandleOauthCallback(res, req)
-
-	// session, _ := store.Get(req, "ssf-receiver-session")
-	// fmt.Printf("session: %+v\n", session)
-	// state, ok := session.Values["state"]
-	// if ok {
-	// 	// Check State
-	// 	s := req.URL.Query().Get("state")
-	// 	c := req.URL.Query().Get("code")
-	// 	if s == "" || s != state {
-	// 		fmt.Println("handleSSFRecieverOauthCallback() - Need to handle no saved state, or wrong value")
-	// 	}
-	// 	if c == "" {
-	// 		fmt.Println("handleSSFRecieverOauthCallback() - Need to handle no code")
-	// 	}
-	// 	// get Tokens
-	// 	postBody := fmt.Sprintf(TokenCall, oauthConfig.ClientId, oauthConfig.ClientSecret, oauthConfig.RedirectURI, c)
-	// 	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/v1/token", oauthConfig.Issuer), bytes.NewBuffer([]byte(postBody)))
-	// 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	// 	client := &http.Client{}
-	// 	resp, err := client.Do(req)
-	// 	if err != nil {
-	// 		fmt.Printf("handleSSFRecieverOauthCallback() - Token call Error: %+v\n", err)
-	// 	}
-
-	// 	defer resp.Body.Close()
-	// 	body, _ := io.ReadAll(resp.Body)
-	// 	if resp.StatusCode != 200 {
-	// 		fmt.Printf("handleSSFRecieverOauthCallback() - Token call Error: %+v\n", string(body))
-	// 		return
-	// 	}
-	// 	var tokenResponse types.TokenReponse
-	// 	if err = json.Unmarshal(body, &tokenResponse); err != nil {
-	// 		fmt.Printf("handleSSFRecieverOauthCallback() - Token Json parse Error: %+v\n", err)
-	// 		return
-	// 	}
-
-	// 	session.Values["authenticated"] = true
-	// 	id := session.Values["state"].(string)
-	// 	session.Values["id"] = id
-	// 	delete(session.Values, "state")
-	// 	session.Save(req, res)
-	// 	ssfReceiverAppData := ssf.SsfReceiverAppData{TokenReponse: tokenResponse, Authenticated: true}
-	// 	// won't validate token like with SecEvt JWT since that is main purpose
-	// 	jwtBody, _ := base64.RawStdEncoding.DecodeString(strings.Split(tokenResponse.IdToken, ".")[1])
-	// 	var m map[string]interface{}
-	// 	err = json.Unmarshal(jwtBody, &m)
-	// 	if err == nil {
-	// 		ssfReceiverAppData.UUID = m["sub"].(string)
-	// 		ssfReceiverAppData.Username = m["preferred_username"].(string)
-	// 	}
-
-	// 	sessionsMap[id] = ssfReceiverAppData
-	// 	fmt.Printf("%+v\n", session.Values)
-	// 	http.Redirect(res, req, "/ssf/receiver/app/embed", http.StatusFound)
-	// } else {
-	// 	// Invalid
-	// 	fmt.Println("handleSSFRecieverOauthCallback() - Need to handle no state")
-	// }
 }
 
+/*
+WebSocket Helpers
+*/
 func handleSSFRecieverWebSocketUpgrade(res http.ResponseWriter, req *http.Request) {
 	// upgrade this connection to a WebSocket connection
 	conn, err := upgrader.Upgrade(res, req, nil)
@@ -356,6 +297,7 @@ func handleSSFRecieverWebSocketUpgrade(res http.ResponseWriter, req *http.Reques
 
 	wsConn = conn
 	log.Println("handleSSFReciever Web Socket Client Connected")
+	wsClientConnected = true
 	// listen indefinitely for new messages coming
 	// through on our WebSocket connection
 	go wsReader()
@@ -373,6 +315,8 @@ func wsReader() {
 		if err != nil {
 			log.Printf("handleSSFReciever wsConn.ReadJSON error: %v\n", err)
 			if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Println("handleSSFReciever wsConn.ReadJSON Client Disconnected")
+				wsClientConnected = false
 				return
 			}
 			continue
@@ -383,8 +327,10 @@ func wsReader() {
 }
 
 func sendSSFRecieverWebSocketMessage(message interface{}) {
-	err := wsConn.WriteJSON(message)
-	if err != nil {
-		log.Printf("sendSSFRecieverWebSocketMessage Error: %v\n", err)
+	if wsClientConnected {
+		err := wsConn.WriteJSON(message)
+		if err != nil {
+			log.Printf("sendSSFRecieverWebSocketMessage Error: %v\n", err)
+		}
 	}
 }

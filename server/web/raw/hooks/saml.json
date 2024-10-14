@@ -1,0 +1,54 @@
+{
+    "commands": [
+     {
+       "type": "com.okta.assertion.patch",
+       "value": [
+         {
+           "op": "replace",
+           "path": "/claims/array/attributeValues/1/value",
+           "value": "replacementValue"
+         },
+         {
+           "op": "replace",
+           "path": "/authentication/authnContext",
+           "value": {
+             "authnContextClassRef": "replacementValue"
+           }
+         },
+         {
+           "op": "add",
+           "path": "/claims/extPatientId",
+           "value": {
+             "attributes": {
+               "NameFormat": "urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
+             },
+             "attributeValues": [
+               {
+                 "attributes": {
+                   "xsi:type": "xs:string"
+                 },
+                 "value": "4321"
+               }
+             ]
+           }
+         },
+         {
+           "op": "add",
+           "path": "/authentication/sessionLifetime",
+           "value": 300
+         }
+       ]
+     },
+     {
+       "type": "com.okta.assertion.patch",
+       "value": [
+         {
+           "op": "replace",
+           "path": "/authentication/sessionIndex",
+           "value": "definitelyARealSession"
+         }
+       ]
+     }
+   ]
+ }
+ 

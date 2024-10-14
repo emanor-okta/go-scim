@@ -1,0 +1,16 @@
+{
+    "commands":[
+      {
+        "type":"com.okta.telephony.action",
+        "value":[
+          {
+            "status":"SUCCESSFUL",
+            "provider":"VONAGE",
+            "transactionId":"SM49a8ece2822d44e4adaccd7ed268f954",
+            "transactionMetadata":"Duration=300ms"
+          }
+        ]
+      }
+    ]
+  }
+  

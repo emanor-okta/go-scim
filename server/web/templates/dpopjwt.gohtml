@@ -1,0 +1,348 @@
+{{template "header" .}}
+
+<script src="/js/ws.js" type="text/javascript"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-base64@3.7.7/base64.min.js"></script>
+
+  <div id="content" class="ui text container-fluid">
+
+    <div class="container">
+      <div class="row g-4">
+        
+        <div class="col">
+          <button type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#configureDpopJwt">Configure</button>
+          {{/* <form action="/dpop/upload_priv_key" method="post" enctype="multipart/form-data">
+            <label for="file">File</label>
+            <input id="priv_key" name="priv_key" type="file" />
+            <button>Upload</button>
+          </form> */}}
+        </div>
+        <div class="col">
+          <button type="button" class="btn btn-outline-dark me-2" onclick="generateJWT()">Generate</button>
+        </div>
+        {{/* <div class="col">
+          <button type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#configureHookModal" data-bs-hooktype="registration">Registration Hook</button>
+        </div>
+        <div class="col">
+          <button type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#configureHookModal" data-bs-hooktype="telephony">Telephony Hook</button>
+        </div>
+        <div class="col">
+          <button type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#configureHookModal" data-bs-hooktype="saml">SAML Hook</button>
+        </div>
+        <div class="col">
+          <button type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#configureHookModal" data-bs-hooktype="token">Token Hook</button>
+        </div> */}}
+        
+      </div>
+    </div> 
+
+
+    <div class="modal fade" id="configureDpopJwt" tabindex="-1" aria-labelledby="configureDpopJwtLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+
+        
+
+          <div class="modal-body">
+
+            <ul class="nav nav-tabs" id="myTab" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="jwt-tab" data-bs-toggle="tab" data-bs-target="#jwt" type="button" role="tab" aria-controls="jwt" aria-selected="true">JWT</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="service-tab" data-bs-toggle="tab" data-bs-target="#service" type="button" role="tab" aria-controls="service" aria-selected="false">Service App</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="auth-tab" data-bs-toggle="tab" data-bs-target="#auth" type="button" role="tab" aria-controls="auth" aria-selected="false">Auth Code</button>
+              </li>
+            </ul>
+            <div class="tab-content" id="myTabContent">
+              <div class="tab-pane fade show active" id="jwt" role="tabpanel" aria-labelledby="jwt-tab">
+                <form action="/dpop/jwt-config" method="post">  {{/* enctype="multipart/form-data"> */}}
+                  <div class="mb-3">
+                    <label for="service-issuer" class="col-form-label">Issuer:</label>
+                    <input type="text" name="issuer" class="form-control" id="service-issuer" placeholder="<required>">
+                    <label for="service-client-id" class="col-form-label">Client id:</label>
+                    <input type="text" name="client-id" class="form-control" id="service-client-id" placeholder="<required>">
+                    <div ondrop="drop(event)" ondragover="dragOverHandler(event);" >
+                      <label for="service-priv-key" class="col-form-label">Private key:</label>
+                      <input type="text" name="priv-key" class="form-control" id="service-priv-key" placeholder="<required>">
+                    </div>
+                    {{/* <form action="/dpop/upload_priv_key" method="post" enctype="multipart/form-data">
+                      <label for="file">Private key:</label>
+                      <input id="priv_key" name="priv_key" type="file" />
+                      <button>Upload</button>
+                    </form> */}}
+                    {{/* <div class="mb-3"> */}}
+                      {{/* <label for="privKeyFile" class="form-label">Private key:</label>
+                      <input name="privKeyFile" class="form-control" type="file" id="privKeyFile"> */}}
+                    {{/* </div> */}}
+                    <hr/>
+                    
+                    <label for="service-priv-key-id" class="col-form-label">Private key id:</label>
+                    <input type="text" name="priv-key-id" class="form-control" id="service-priv-key-id" placeholder="<optional>">
+                    
+                    {{/* <input type="submit"/> */}}
+                    <button type="submit" class="btn btn-primary">Save</button>
+                  </div>
+                </form>
+              </div>
+
+              <div class="tab-pane fade" id="service" role="tabpanel" aria-labelledby="service-tab">
+                <form action="/dpop/service-config" method="post" enctype="multipart/form-data">
+                  <div class="mb-3">
+                    <label for="service-issuer" class="col-form-label">Issuer:</label>
+                    <input type="text" class="form-control" id="service-issuer" placeholder="<required>">
+                    <label for="service-client-id" class="col-form-label">Client id:</label>
+                    <input type="text" class="form-control" id="service-client-id" placeholder="<required>">
+                    <label for="service-scopes" class="col-form-label">Scopes:</label>
+                    <input type="text" class="form-control" id="service-scopes" placeholder="<required>">
+                    <hr/>
+                    <label for="service-client-secret" class="col-form-label">Client secret:</label>
+                    <input type="text" class="form-control" id="service-client-secret" placeholder="<optional>">
+                    {{/* <label for="service-priv-key" class="col-form-label">Private key:</label>
+                    <input type="text" class="form-control" id="service-priv-key" placeholder="<optional>"> */}}
+                    <label for="service-priv-key" class="form-label">Private key:</label>
+                    <input class="form-control" type="file" id="service-priv-key">
+                    <label for="service-priv-key-id" class="col-form-label">Private key id:</label>
+                    <input type="text" class="form-control" id="service-priv-key-id" placeholder="<optional>">
+                    <label for="service-dpop-key" class="col-form-label">DPoP key:</label>
+                    <input type="text" class="form-control" id="service-dpop-key" placeholder="<optional>">
+                    <label for="service-endpoint" class="col-form-label">API Endpoint:</label>
+                    <input type="text" class="form-control" id="service-endpoint" placeholder="<optional>">
+                    <label for="service-method" class="col-form-label">API method:</label>
+                    <input type="text" class="form-control" id="service-method" placeholder="<optional>">
+                  </div>
+                </form>
+              </div>
+
+              <div class="tab-pane fade" id="auth" role="tabpanel" aria-labelledby="auth-tab">
+                .auth..
+              </div>
+            </div>
+
+                  
+              {{/* <div class="mb-3">
+                <textarea style="resize:none" class="form-control" id="editHookTextArea" name="editHookTextArea" rows="20" cols="25"></textarea>
+              </div>
+              <hr/> */}}
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="saveDpopJwtConfig()">Save</button>
+          </div> 
+        </div> 
+      </div>
+    </div>   
+
+
+    {{/* <div class="container">
+      <h5 style="text-align:center">Hook Messages from Okta</h5>
+        <div>
+          <textarea style="resize:none" class="form-control" id="hooksReceiveMessageArea" name="hooksReceiveMessageArea" rows="30" cols="10" readonly></textarea>
+        </div>
+    </div> */}}
+
+    <div class="row">
+      <div class="col-6"> 
+        <div class="container-fluid">
+          <h5 style="text-align:center">Debug</h5>
+          <div>
+            <textarea style="resize:none" class="form-control" id="debugArea" name="debugArea" rows="30" cols="10" readonly></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-6">
+        <div class="container-fluid">
+          <h5 style="text-align:center">Result</h5>
+          <div>
+            <textarea style="resize:none" class="form-control" id="resultArea" name="resultArea" rows="30" cols="10" readonly></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+
+
+
+
+
+<script type="text/javascript">
+    //var hooksReceiveSocket;
+    var hookType;
+    //intiializeHooksReceiverWS();
+    
+
+    function drop(ev) {
+      ev.preventDefault();
+      var data = ev.dataTransfer.getData("text");
+      console.log('data')
+      console.log(data)
+      if (ev.dataTransfer.files.length > 0) {
+        console.log(ev.dataTransfer.files[0]);
+        const reader = new FileReader();
+
+        reader.addEventListener(
+          "load",
+          () => {
+            // this will then display a text file
+            console.log(reader.result);
+            document.getElementById('service-priv-key').value = Base64.encode(reader.result);
+          },
+          false,
+        );
+
+        reader.readAsText(ev.dataTransfer.files[0]);
+      }
+      {{/* ev.target.appendChild(document.getElementById(data)); */}}
+    }
+    function dragOverHandler(ev) {
+      console.log("File(s) in drop zone");
+
+      // Prevent default behavior (Prevent file from being opened)
+      ev.preventDefault();
+    }
+
+
+    /*
+    const privKeyForm = document.querySelector('form');
+    privKeyForm.addEventListener('submit', handleSubmitPrivKey);
+
+    function handleSubmitPrivKey(event) {
+      const url = new URL(privKeyForm.action);
+      const privKeyFormData = new FormData(privKeyForm);
+
+      const fetchOptions = {
+        method: privKeyForm.method,
+        body: privKeyFormData,
+      };
+
+      fetch(url, fetchOptions);
+
+      event.preventDefault();
+    }
+    */
+    {{/* document.querySelector("#jwt form").addEventListener('submit', saveDpopJwtConfig); */}}
+
+    /*
+      WS support
+    */
+    /*
+    function intiializeHooksReceiverWS() {
+      console.log("Attempting intiializeHooksReceiverWS Connection...");
+      if (window.location.protocol.includes("https")) {
+          console.log("Attempting wss..");
+          hooksReceiveSocket = new WebSocket("wss://" + location.host + "/hooks/inline/ws");
+      } else {
+          hooksReceiveSocket = new WebSocket("ws://" + location.host + "/hooks/inline/ws");
+      }
+     
+      hooksReceiveSocket.onopen = () => {
+          console.log("Successfully Connected intiializeHooksReceiverWS()");
+          hooksReceiveWsPing();
+      };
+
+      hooksReceiveSocket.onmessage = hooksReceiveOnMessage;
+      hooksReceiveSocket.onclose = hooksReceiveOnClose;
+      hooksReceiveSocket.onerror = hooksReceiveOnError;
+    }
+
+    function hooksReceiveOnMessage(event) {
+      console.log('hooksReceiveOnMessage message received')
+      console.log(event.data);
+      const jsonObj = JSON.parse(event.data);
+      var msg = createMessageReceivedHeader(jsonObj.type);
+      
+      msg += '   ----- Request -----\n';
+      msg += JSON.stringify(jsonObj.request, '', 2)
+      msg += '\n----------------------------------------\n';
+      msg += '   ----- Response -----\n';
+      msg += JSON.stringify(jsonObj.response, '', 2)
+
+      {-{/-* msg += JSON.stringify(jsonObj, '', 2) *-/}-}
+      
+      msg += '\n' + document.getElementById('hooksReceiveMessageArea').value;
+      document.getElementById('hooksReceiveMessageArea').value = msg;
+      document.getElementById('hooksReceiveMessageArea').scrollTo(0, 0);
+    }
+
+    function hooksReceiveOnClose(event) {
+      console.log("hooksReceiveOnClose Socket Closed Connection: ", event);
+      hooksReceiveSocket.send("Client Closed!")
+    }
+
+    function hooksReceiveOnError(error) {
+      console.log("hooksReceiveOnError Socket Error: ", error);
+    }
+
+    function hooksReceiveSendMessage(msg) {
+      hooksReceiveSocket.send(msg);
+    }
+
+    function hooksReceiveWsPing() {
+      if (!hooksReceiveSocket) return;
+      if (hooksReceiveSocket.readyState !== 1) return;
+      hooksReceiveSendMessage('{"uuid": "ping"}');
+      setTimeout(hooksReceiveWsPing, 10000);
+    }
+
+
+    /-*
+      Helpers
+    *-/
+    function createMessageReceivedHeader(hookType) {
+      return `
+-------------------------------------------------------------------
+              Received ${hookType}                          
+-------------------------------------------------------------------
+`
+    }
+    */
+    function saveDpopJwtConfig(event) {
+    console.log(event);
+      const activeTab = document.querySelector(".nav-link.active");
+      var formData;
+      var tab;
+      if (activeTab.id === 'jwt-tab') {
+        formData = document.querySelector("#jwt form")
+        tab = 'jwt';
+      } else if (activeTab.id === 'service-tab') {
+        formData = document.querySelector("#service form")
+        tab = 'service';
+      } else if (activeTab.id === 'auth-tab') {
+        formData = document.querySelector("#auth form")
+        tab = 'auth';
+      } else {
+        // ?
+        console.log(`Unexpected value for activeTab: ${activeTab}`);
+        return;
+      }
+
+      const url = new URL(formData.action);
+      const _formData = new FormData(formData);
+      console.log(formData);
+      console.log(_formData);
+
+{{/* console.log(event);
+      const url = new URL(event.target.action);
+      const _formData = new FormData(event.target);
+      console.log(url);
+      console.log(_formData); */}}
+
+      const fetchOptions = {
+        method: "POST",
+        body: _formData,
+      };
+{{/* event.preventDefault(); */}}
+      fetch(url, fetchOptions);
+
+
+      //var editHookTextArea = configureHookModal.querySelector('#editHookTextArea')
+      //sendPost(location.origin + '/hooks/inline/config?type=' + hookType, editHookTextArea.value, ()=>{ console.log('saveHookConfig success') });
+    }
+
+</script>
+
+{{template "footer"}}

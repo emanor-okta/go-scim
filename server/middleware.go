@@ -70,14 +70,32 @@ func getBodyMiddleware(h http.HandlerFunc) http.HandlerFunc {
 func filterIpMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		addr := utils.GetRemoteAddress(r)
-		fmt.Printf("Checking Address: %s\n", addr)
 		_, ok := config.Server.Allowed_ips[addr]
+		fmt.Printf("filterIpMiddleware Checking Address: %s, Allow: %v\n", addr, ok)
 		if ok {
 			h.ServeHTTP(w, r)
 		} else {
 			log.Printf("%sfilterIpMiddleware: Denying Request from %s\n", _logPrefix, addr)
 			// w.WriteHeader(http.StatusForbidden)
-			http.Redirect(w, r, "/authorizeMyIp", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, fmt.Sprintf("/authorizeMyIp?restore-url=%s", r.RequestURI), http.StatusTemporaryRedirect)
+		}
+	})
+}
+
+func filterProxyIpMiddleware(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		addr := utils.GetRemoteAddress(r)
+		ok := true
+		if config.Server.ProxyFilterIps {
+			_, ok = config.Server.Allowed_ips[addr]
+			fmt.Printf("filterProxyIpMiddleware Checking Address: %s, Will Allow: %v\n", addr, ok)
+		}
+		if ok {
+			h.ServeHTTP(w, r)
+		} else {
+			log.Printf("%sfilterIpMiddleware: Denying Request from %s\n", _logPrefix, addr)
+			// w.WriteHeader(http.StatusForbidden)
+			http.Redirect(w, r, fmt.Sprintf("/authorizeMyIp?restore-url=%s", r.RequestURI), http.StatusTemporaryRedirect)
 		}
 	})
 }
