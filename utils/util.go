@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -356,8 +357,8 @@ func HandleWebSocketUpgrade(res http.ResponseWriter, req *http.Request, wsClient
 }
 
 /*
-Used only for Ping to keep WS open
-*/
+ * Used only for Ping to keep WS open
+ */
 func WsPingOnlyReader(wsConn *websocket.Conn, wsClientConnected *bool) {
 	for {
 		// read in a message
@@ -376,4 +377,54 @@ func WsPingOnlyReader(wsConn *websocket.Conn, wsClientConnected *bool) {
 
 		// fmt.Printf("handleSSFReciever message: %+v\n", m)
 	}
+}
+
+/*
+ * Populate SCIM Entitlements into Config
+ */
+func LoadScimEntitlements() {
+	result, err := GetResourceTypes()
+	if err == nil && result != "" {
+		// assume Entitlement bits are stored in Redis, load from Redis
+		Config.Entitlements.ResourceTypes = []byte(result)
+
+		results, err := GetResources()
+		if err == nil {
+			Config.Entitlements.Resources = make(map[string][]byte)
+			for k, v := range results {
+				Config.Entitlements.Resources[k] = []byte(v)
+			}
+		}
+
+		result, err = GetSchemas()
+		if err == nil {
+			Config.Entitlements.Schemas = []byte(result)
+		}
+	} else {
+		// either error'd loading from Redis or wasn't set, load defaults
+		Config.Entitlements.ResourceTypes = LoadRawJson("./server/web/raw/entitlements/resource_types.json")
+		// Config.Entitlements.Roles = LoadRawJson("./server/web/raw/entitlements/roles.json")
+		Config.Entitlements.Resources = make(map[string][]byte)
+		Config.Entitlements.Resources["roles"] = LoadRawJson("./server/web/raw/entitlements/roles.json")
+		Config.Entitlements.Resources["entitlements"] = LoadRawJson("./server/web/raw/entitlements/entitlements.json")
+		Config.Entitlements.Resources["features"] = LoadRawJson("./server/web/raw/entitlements/features.json")
+		Config.Entitlements.Resources["licenses"] = LoadRawJson("./server/web/raw/entitlements/licenses.json")
+		Config.Entitlements.Schemas = LoadRawJson("./server/web/raw/entitlements/schemas.json")
+		// save to redis
+		SetResourceTypes(string(Config.Entitlements.ResourceTypes))
+		SetSchema(string(Config.Entitlements.Schemas))
+		SetResource("roles", string(Config.Entitlements.Resources["roles"]))
+		SetResource("entitlements", string(Config.Entitlements.Resources["entitlements"]))
+		SetResource("features", string(Config.Entitlements.Resources["features"]))
+		SetResource("licenses", string(Config.Entitlements.Resources["licenses"]))
+	}
+}
+
+func LoadRawJson(fileName string) []byte {
+	result, err := os.ReadFile(fileName)
+	if err != nil {
+		log.Printf("Error: LoadRawJson for file: %s, error: %v\n", fileName, err)
+		result = []byte{}
+	}
+	return result
 }

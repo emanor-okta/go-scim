@@ -28,11 +28,11 @@ server:
         client_id: "0oagpm3efxFP4UXkw1d7"
         client_secret: "BBfY-vATLN8b7WGZAuPkW9fd2cRLqVe1dFQbCazACmTuBIqx3L0IrHUwzCu5gyRO"
         scopes: "openid profile email go_scim"
-        redirect_uri: "http://localhost:8082/authorizeMyIp/callback"
-        # redirect_uri: "https://gw.oktamanor.net:8443/authorizeMyIp/callback"
+        # redirect_uri: "http://localhost:8082/authorizeMyIp/callback"
+        redirect_uri: "https://gw.oktamanor.net:8443/authorizeMyIp/callback"
 scim:
     enable_groups: true
     users_endpoint: "/goscim/scim/v2/Users"
     groups_endpoint: "/goscim/scim/v2/Groups"
 # build: "v1.22.001"
-build: "v1.31.009"
+build: "v1.34.004"

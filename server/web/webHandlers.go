@@ -131,6 +131,7 @@ func StartWebServer(c *utils.Configuration, mw []types.Middleware) {
 		http.HandleFunc("/redis/flush", utils.AddMiddleware(handleFlush, commonMiddlewares...))
 		http.HandleFunc("/raw/user.json", utils.AddMiddleware(handleRawJSON, commonMiddlewares...))
 		http.HandleFunc("/raw/group.json", utils.AddMiddleware(handleRawJSON, commonMiddlewares...))
+		http.HandleFunc("/entitlements", utils.AddMiddleware(handleEntitlements, commonMiddlewares...))
 	}
 	if c.Services.Proxy {
 		http.HandleFunc("/proxy", utils.AddMiddleware(handleProxyMessages, commonMiddlewares...))

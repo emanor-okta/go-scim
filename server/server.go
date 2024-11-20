@@ -88,6 +88,11 @@ func StartServer(c *utils.Configuration) {
 		http.HandleFunc("/goscim/scim/v2/Groups", utils.AddMiddleware(handleGroups, scimMiddlewares...))
 		http.HandleFunc("/goscim/scim/v2/Groups/", utils.AddMiddleware(handleGroup, scimMiddlewares...))
 		http.HandleFunc("/goscim/scim/v2/ServiceProviderConfig", utils.AddMiddleware(handleServiceProviderConfig, scimMiddlewares...))
+
+		http.HandleFunc("/goscim/scim/v2/ResourceTypes", utils.AddMiddleware(handleResourceTypes, scimMiddlewares...))
+		http.HandleFunc("/goscim/scim/v2/ResourceTypes/", utils.AddMiddleware(handleResourceType, scimMiddlewares...))
+		http.HandleFunc("/goscim/scim/v2/Schemas", utils.AddMiddleware(handleSchemas, scimMiddlewares...))
+
 		// hack for OPP
 		// http.HandleFunc("/goscim/v2/scim/Users", utils.AddMiddleware(handleUsers, scimMiddlewares...))
 		// http.HandleFunc("/goscim/v2/scim/Users/", utils.AddMiddleware(handleUser, scimMiddlewares...))
@@ -100,7 +105,7 @@ func StartServer(c *utils.Configuration) {
 	http.HandleFunc("/mock/oauth2/v1/authorize", utils.AddMiddleware(handleAuthorizeReq, commonScimMiddlewares...))
 	http.HandleFunc("/mock/oauth2/v1/token", utils.AddMiddleware(handleTokenReq, commonScimMiddlewares...))
 
-	// SSF Receiver Handlers  (no handlers in webHandlers.go)
+	// SSF Receiver/Transmitter Handlers  (no handlers in webHandlers.go)
 	if config.Services.Ssf {
 		// config.Server.Allowed_ips["[::1]"] = "blank"
 		http.HandleFunc("/ssf/receiver", utils.AddMiddleware(handleSSFReq, commonScimMiddlewares...))
@@ -112,6 +117,8 @@ func StartServer(c *utils.Configuration) {
 		http.HandleFunc("/ssf/receiver/app/callback", utils.AddMiddleware(handleSSFRecieverOauthCallback, commonScimMiddlewares...))
 		http.HandleFunc("/ssf/receiver/app/ws", utils.AddMiddleware(handleSSFRecieverWebSocketUpgrade, commonScimMiddlewares...))
 		http.HandleFunc("/ssf/transmitter/app", utils.AddMiddleware(handleSSFTransmitter, commonScimMiddlewares...))
+		http.HandleFunc("/ssf/transmitter/keys", utils.AddMiddleware(handleSSFTransmitterKeys, commonScimMiddlewares...))
+		http.HandleFunc("/ssf/transmitter/.well-known/sse-configuration", utils.AddMiddleware(handleSSFTransmitterConfig, commonScimMiddlewares...))
 	}
 
 	// Hooks Handlers (no handlers in webHandlers.go)
@@ -131,8 +138,8 @@ func StartServer(c *utils.Configuration) {
 		http.HandleFunc("/dpop/upload_priv_key", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
 		http.HandleFunc("/dpop/upload_dpop_key", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
 		http.HandleFunc("/dpop/jwt-config", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
-		http.HandleFunc("/dpop/m2m-config", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
-		http.HandleFunc("/dpop/web-config", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
+		http.HandleFunc("/dpop/service-config", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
+		http.HandleFunc("/dpop/auth-config", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
 	}
 
 	// // Show Authorize page for unauthorized IP

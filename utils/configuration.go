@@ -61,12 +61,20 @@ type Dpop struct {
 	DebugNet bool
 }
 
+type Entitlements struct {
+	ResourceTypes,
+	Schemas []byte
+	Resources map[string][]byte
+	// Schemas map[string][]byte
+}
+
 type Configuration struct {
 	Build     string
 	ReqFilter *ReqFilter
 	Services
 	Hooks
 	Dpop
+	Entitlements
 	CommonScimMiddlewares []types.Middleware
 	Redis                 struct {
 		Address  string

@@ -1,0 +1,26 @@
+{
+    "schemas": [
+      "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+    ],
+    "totalResults": 2,
+    "startIndex": 1,
+    "itemsPerPage": 2,
+    "Resources": [
+        {
+            "schemas": [
+                "urn:okta:scim:schemas:core:1.0:Entitlement"
+            ],
+            "id": "license-1",
+            "displayName": "On Premises",
+            "description": "On Site Installation License"
+        },
+        {
+            "schemas": [
+                "urn:okta:scim:schemas:core:1.0:Entitlement"
+            ],
+            "id": "license-2",
+            "displayName": "Cloud",
+            "description": "Cloud License"
+        }
+    ]
+}

@@ -218,9 +218,39 @@ function generateMessageHar() {
   document.getElementById('message_har_iframe').src = location.origin + '/har/generate?type=message';
 }
 
-function sendPost(url, msg, success) {
+function sendGet(url, success) {
   const options = {
-    method: "POST",
+    method: "GET",
+  };
+  const request = new Request(url, options);
+  fetch(request)
+  .then(response => {
+    console.log(response);
+    if (!response.ok) {
+      response.text()
+      .then(d => {
+        alert('Failed posting to: ' + url +'\nStatus: ' + response.statusText + '\nError: ' + d);
+      });
+      return;
+    }
+    success(response);
+  }).catch(err => {
+    console.log(err);
+    alert('Failed posting to: ' + url +', error: ' + err);
+  });
+}
+
+function sendPut(url, msg, success) {
+  sendUpsert(url, "PUT", msg, success);
+}
+
+function sendPost(url, msg, success) {
+  sendUpsert(url, "POST", msg, success);
+}
+
+function sendUpsert(url, method, msg, success) {
+  const options = {
+    method: method,
     body: msg,
   };
   const request = new Request(url, options);

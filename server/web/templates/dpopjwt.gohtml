@@ -55,68 +55,95 @@
                 <button class="nav-link" id="auth-tab" data-bs-toggle="tab" data-bs-target="#auth" type="button" role="tab" aria-controls="auth" aria-selected="false">Auth Code</button>
               </li>
             </ul>
+
             <div class="tab-content" id="myTabContent">
               <div class="tab-pane fade show active" id="jwt" role="tabpanel" aria-labelledby="jwt-tab">
-                <form action="/dpop/jwt-config" method="post">  {{/* enctype="multipart/form-data"> */}}
+                <form action="/dpop/jwt-config" method="post">
                   <div class="mb-3">
-                    <label for="service-issuer" class="col-form-label">Issuer:</label>
-                    <input type="text" name="issuer" class="form-control" id="service-issuer" placeholder="<required>">
-                    <label for="service-client-id" class="col-form-label">Client id:</label>
-                    <input type="text" name="client-id" class="form-control" id="service-client-id" placeholder="<required>">
-                    <div ondrop="drop(event)" ondragover="dragOverHandler(event);" >
-                      <label for="service-priv-key" class="col-form-label">Private key:</label>
-                      <input type="text" name="priv-key" class="form-control" id="service-priv-key" placeholder="<required>">
+                    <label for="jwt-issuer" class="col-form-label">Issuer:</label>
+                    <input type="text" name="issuer" class="form-control" id="jwt-issuer" placeholder="<required>">
+                    <label for="jwt-client-id" class="col-form-label">Client id:</label>
+                    <input type="text" name="client-id" class="form-control" id="jwt-client-id" placeholder="<required>">
+                    <div>
+                      <label for="jwt-priv-key" class="col-form-label">Private key:</label>
+                      <input type="text" name="priv-key" class="form-control" id="jwt-priv-key" placeholder="<required>" ondrop="drop(event)" ondragover="dragOverHandler(event);">
+                      <input type="text" name="priv-key-enc" class="form-control" id="jwt-priv-key-enc" hidden>
                     </div>
-                    {{/* <form action="/dpop/upload_priv_key" method="post" enctype="multipart/form-data">
-                      <label for="file">Private key:</label>
-                      <input id="priv_key" name="priv_key" type="file" />
-                      <button>Upload</button>
-                    </form> */}}
-                    {{/* <div class="mb-3"> */}}
-                      {{/* <label for="privKeyFile" class="form-label">Private key:</label>
-                      <input name="privKeyFile" class="form-control" type="file" id="privKeyFile"> */}}
-                    {{/* </div> */}}
                     <hr/>
+                    <label for="jwt-priv-key-id" class="col-form-label">Private key id:</label>
+                    <input type="text" name="priv-key-id" class="form-control" id="jwt-priv-key-id" placeholder="<optional>">
                     
-                    <label for="service-priv-key-id" class="col-form-label">Private key id:</label>
-                    <input type="text" name="priv-key-id" class="form-control" id="service-priv-key-id" placeholder="<optional>">
-                    
-                    {{/* <input type="submit"/> */}}
-                    <button type="submit" class="btn btn-primary">Save</button>
+                    <input id="jwt-submit" type="submit" hidden/>
                   </div>
                 </form>
               </div>
 
               <div class="tab-pane fade" id="service" role="tabpanel" aria-labelledby="service-tab">
-                <form action="/dpop/service-config" method="post" enctype="multipart/form-data">
+                <form action="/dpop/service-config" method="post">
                   <div class="mb-3">
                     <label for="service-issuer" class="col-form-label">Issuer:</label>
-                    <input type="text" class="form-control" id="service-issuer" placeholder="<required>">
+                    <input type="text" name="issuer" class="form-control" id="service-issuer" placeholder="<required>">
                     <label for="service-client-id" class="col-form-label">Client id:</label>
-                    <input type="text" class="form-control" id="service-client-id" placeholder="<required>">
+                    <input type="text" name="client-id" class="form-control" id="service-client-id" placeholder="<required>">
                     <label for="service-scopes" class="col-form-label">Scopes:</label>
-                    <input type="text" class="form-control" id="service-scopes" placeholder="<required>">
+                    <input type="text" name="scopes" class="form-control" id="service-scopes" placeholder="<required>">
                     <hr/>
                     <label for="service-client-secret" class="col-form-label">Client secret:</label>
-                    <input type="text" class="form-control" id="service-client-secret" placeholder="<optional>">
-                    {{/* <label for="service-priv-key" class="col-form-label">Private key:</label>
-                    <input type="text" class="form-control" id="service-priv-key" placeholder="<optional>"> */}}
-                    <label for="service-priv-key" class="form-label">Private key:</label>
-                    <input class="form-control" type="file" id="service-priv-key">
+                    <input type="text" name="client-secret" class="form-control" id="service-client-secret" placeholder="<optional>">
+                    
+                    <div >
+                      <label for="service-priv-key" class="col-form-label">Private key:</label>
+                      <input type="text" name="priv-key" class="form-control" id="service-priv-key" placeholder="<optional>" ondrop="drop(event)" ondragover="dragOverHandler(event);">
+                      <input type="text" name="priv-key-enc" class="form-control" id="service-priv-key-enc" hidden>
+                    </div>
                     <label for="service-priv-key-id" class="col-form-label">Private key id:</label>
-                    <input type="text" class="form-control" id="service-priv-key-id" placeholder="<optional>">
-                    <label for="service-dpop-key" class="col-form-label">DPoP key:</label>
-                    <input type="text" class="form-control" id="service-dpop-key" placeholder="<optional>">
+                    <input type="text" name="priv-key-id" class="form-control" id="service-priv-key-id" placeholder="<optional>">
+                    
+                    <div  >
+                      <label for="service-dpop-key" class="col-form-label">DPoP key:</label>
+                      <input type="text" name="dpop-key" class="form-control" id="service-dpop-key" placeholder="<optional>" ondrop="drop(event)" ondragover="dragOverHandler(event);">
+                      <input type="text" name="dpop-key-enc" class="form-control" id="service-dpop-key-enc" hidden>
+                    </div>
+
                     <label for="service-endpoint" class="col-form-label">API Endpoint:</label>
-                    <input type="text" class="form-control" id="service-endpoint" placeholder="<optional>">
+                    <input type="text" name="service-endpoint" class="form-control" id="service-endpoint" placeholder="<optional>">
                     <label for="service-method" class="col-form-label">API method:</label>
-                    <input type="text" class="form-control" id="service-method" placeholder="<optional>">
+                    <input type="text" name="service-method" class="form-control" id="service-method" placeholder="<optional>">
+
+                    <input id="service-submit" type="submit" hidden/>
                   </div>
                 </form>
               </div>
 
               <div class="tab-pane fade" id="auth" role="tabpanel" aria-labelledby="auth-tab">
-                .auth..
+                <form action="/dpop/auth-config" method="post">
+                  <div class="mb-3">
+                    <label for="auth-issuer" class="col-form-label">Issuer:</label>
+                    <input type="text" name="issuer" class="form-control" id="auth-issuer" placeholder="<required>">
+                    <label for="auth-client-id" class="col-form-label">Client id:</label>
+                    <input type="text" name="client-id" class="form-control" id="auth-client-id" placeholder="<required>">
+                    <label for="auth-scopes" class="col-form-label">Scopes:</label>
+                    <input type="text" name="scopes" class="form-control" id="auth-scopes" placeholder="<required>">
+                    <hr/>
+                    <label for="auth-client-secret" class="col-form-label">Client secret:</label>
+                    <input type="text" name="client-secret" class="form-control" id="auth-client-secret" placeholder="<optional>">
+                    <label for="auth-code" class="col-form-label">Authorization Code:</label>
+                    <input type="text" name="auth-code" class="form-control" id="auth-code" placeholder="<optional>">
+                    <label for="auth-code-verifier" class="col-form-label">Code Verifier:</label>
+                    <input type="text" name="auth-code-verifier" class="form-control" id="auth-code-verifier" placeholder="<optional>">
+                    <label for="auth-redirect-uri" class="col-form-label">Redirect URI:</label>
+                    <input type="text" name="redirect-uri" class="form-control" id="auth-redirect-uri" placeholder="<optional>">
+                    <label for="auth-port" class="col-form-label">Port:</label>
+                    <input type="text" name="port" class="form-control" id="auth-port" placeholder="<optional>">
+           
+                    <label for="auth-endpoint" class="col-form-label">API Endpoint:</label>
+                    <input type="text" name="auth-endpoint" class="form-control" id="auth-endpoint" placeholder="<optional>">
+                    <label for="auth-method" class="col-form-label">API method:</label>
+                    <input type="text" name="auth-method" class="form-control" id="auth-method" placeholder="<optional>">
+
+                    <input id="auth-submit" type="submit" hidden/>
+                  </div>
+                </form>
               </div>
             </div>
 
@@ -170,61 +197,61 @@
 
 
 <script type="text/javascript">
-    //var hooksReceiveSocket;
-    var hookType;
-    //intiializeHooksReceiverWS();
     
-
     function drop(ev) {
+      ev.target.style = "";
       ev.preventDefault();
       var data = ev.dataTransfer.getData("text");
-      console.log('data')
-      console.log(data)
+      //console.log('data')
+      //console.log(data)
+      
       if (ev.dataTransfer.files.length > 0) {
-        console.log(ev.dataTransfer.files[0]);
         const reader = new FileReader();
+        {{/* var keyElement;
+        var keyElementEnc;
+        if (ev.target.id === 'jwt-priv-key') {
+          keyElement = 'jwt-priv-key';
+          keyElementEnc = 'jwt-priv-key-enc';
+        } else if (ev.target.id === 'service-priv-key') {
+          keyElement = 'jwt-priv-key';
+          keyElementEnc = 'jwt-priv-key-enc';
+        } */}}
+        const keyElement = ev.target.id;
+        const keyElementEnc = `${keyElement}-enc`
 
         reader.addEventListener(
           "load",
           () => {
-            // this will then display a text file
-            console.log(reader.result);
-            document.getElementById('service-priv-key').value = Base64.encode(reader.result);
+            //console.log(reader.result);
+            document.getElementById(keyElementEnc).value = Base64.encode(reader.result);
+            document.getElementById(keyElement).value = 'Private Key Set';
+            document.getElementById(keyElement).disabled = true;
           },
           false,
         );
 
         reader.readAsText(ev.dataTransfer.files[0]);
       }
-      {{/* ev.target.appendChild(document.getElementById(data)); */}}
     }
+  
     function dragOverHandler(ev) {
-      console.log("File(s) in drop zone");
-
+      ev.target.style="border-width: thick";
       // Prevent default behavior (Prevent file from being opened)
       ev.preventDefault();
     }
 
+    function pasteEvent(ev) {
+      const keyElement = ev.target.id;
+      const keyElementEnc = `${keyElement}-enc`
 
-    /*
-    const privKeyForm = document.querySelector('form');
-    privKeyForm.addEventListener('submit', handleSubmitPrivKey);
-
-    function handleSubmitPrivKey(event) {
-      const url = new URL(privKeyForm.action);
-      const privKeyFormData = new FormData(privKeyForm);
-
-      const fetchOptions = {
-        method: privKeyForm.method,
-        body: privKeyFormData,
-      };
-
-      fetch(url, fetchOptions);
-
-      event.preventDefault();
+      document.getElementById(keyElementEnc).value = Base64.encode((ev.clipboardData || window.clipboardData).getData("text"));
+      document.getElementById(keyElement).value = 'Private Key Set';
+      document.getElementById(keyElement).disabled = true;
     }
-    */
-    {{/* document.querySelector("#jwt form").addEventListener('submit', saveDpopJwtConfig); */}}
+
+    document.querySelector("#jwt form").addEventListener('submit', saveDpopJwtConfig);
+    document.getElementById('jwt-priv-key').addEventListener("paste", pasteEvent);
+    document.getElementById('service-priv-key').addEventListener("paste", pasteEvent);
 
     /*
       WS support
@@ -301,47 +328,44 @@
     }
     */
     function saveDpopJwtConfig(event) {
-    console.log(event);
+      //console.log(event);
       const activeTab = document.querySelector(".nav-link.active");
-      var formData;
-      var tab;
       if (activeTab.id === 'jwt-tab') {
-        formData = document.querySelector("#jwt form")
-        tab = 'jwt';
+        document.getElementById('jwt-submit').click();
       } else if (activeTab.id === 'service-tab') {
-        formData = document.querySelector("#service form")
-        tab = 'service';
+        document.getElementById('service-submit').click();
       } else if (activeTab.id === 'auth-tab') {
-        formData = document.querySelector("#auth form")
-        tab = 'auth';
+        document.getElementById('auth-submit').click();
       } else {
         // ?
         console.log(`Unexpected value for activeTab: ${activeTab}`);
         return;
       }
-
-      const url = new URL(formData.action);
-      const _formData = new FormData(formData);
-      console.log(formData);
-      console.log(_formData);
-
-{{/* console.log(event);
-      const url = new URL(event.target.action);
-      const _formData = new FormData(event.target);
-      console.log(url);
-      console.log(_formData); */}}
-
-      const fetchOptions = {
-        method: "POST",
-        body: _formData,
-      };
-{{/* event.preventDefault(); */}}
-      fetch(url, fetchOptions);
-
-
-      //var editHookTextArea = configureHookModal.querySelector('#editHookTextArea')
-      //sendPost(location.origin + '/hooks/inline/config?type=' + hookType, editHookTextArea.value, ()=>{ console.log('saveHookConfig success') });
     }
+
+    function generateJWT() {
+      fetch(location.origin + '/dpop/generate_dpop')
+      .then(response => {
+        if (!response.ok) {
+          alert('Failed to load content from: ' + url + '\nStatus: ' + response.statusText);
+          return;
+        }
+        response.json()
+        .then(data => {
+          const result = JSON.stringify(data, null, "  ");
+          console.log(result);
+          const el = document.getElementById('resultArea');
+          el.value = `${resultHeader()}${result}\n\n${el.value}`;
+        });
+      }).catch(err => {
+        console.log(err);
+        alert('Failed to load content from: \nError: ' + err);
+      });
+    }
+
+    function resultHeader() {
+      return '          ----------  RESULT ----------\n\n'
+    } 
 
 </script>
 

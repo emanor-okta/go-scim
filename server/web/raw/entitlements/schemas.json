@@ -1,0 +1,32 @@
+{
+    "schemas": [
+      "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+    ],
+    "totalResults": 1,
+    "startIndex": 1,
+    "itemsPerPage": 1,
+    "Resources": [
+        {
+            "id": "urn:oktamanor:scim:schemas:extension:appname:1.0:Profile",
+            "name": "Profile",
+            "description": "An example of a Profile Entitlement schema extension",
+            "attributes": [
+            {
+                "name": "customProfileProperty",
+                "type": "string",
+                "multiValued": false,
+                "description": "A Profile Entitlement extension field",
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none"
+            }
+            ],
+            "meta": {
+                "resourceType": "Schema",
+                "location": "/v2/Schemas/urn:oktamanor:scim:schemas:extension:appname:1.0:Profile"
+            }
+        }
+    ]
+}

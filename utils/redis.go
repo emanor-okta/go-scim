@@ -22,6 +22,13 @@ const (
 	GROUPS_REVERSE_LOOKUP_KEY = "_groups_reverse_lookup"
 	EMBEDDED_MEMBERS          = "_members"
 	EMBEDDED_GROUPS           = "_groups"
+
+	ENTITLEMENTS_RESOURCE_TYPES = "_entitlements_resource_types"
+	ENTITLEMENTS_RESOURCES      = "_entitlements_resources"
+	ENTITLEMENTS_SCHEMAS        = "_entitlements_schema"
+	ENTITLEMENTS_ROLES          = "_entitlements_roles"
+
+	DONT_EXPIRE = 0
 )
 
 type UserPatch struct {
@@ -104,6 +111,45 @@ func UpdateDoc(key string, doc interface{}) error {
 			return err
 		}
 		return errors.New("not_found")
+	}
+	return nil
+}
+
+func hashGetAll(key string) (map[string]string, error) {
+	result, err := rdb.HGetAll(ctx, key).Result()
+	if err != nil {
+		log.Printf("Redis Error hashGetAll for key %s\n%v\n\n", key, err.Error())
+		// return nil, err
+	}
+	return result, nil
+}
+
+func hashSet(key string, doc interface{}) error {
+	if err := rdb.HSet(ctx, key, doc).Err(); err != nil {
+		log.Printf("Redis Error hashSet for key %s value: %+v\n%v\n\n", key, doc, err.Error())
+		return err
+	}
+	return nil
+}
+
+func hashDeleteKey(hash, key string) error {
+	_, err := rdb.HDel(ctx, hash, key).Result()
+	return err
+}
+
+func getString(key string) (string, error) {
+	result, err := rdb.Get(ctx, key).Result()
+	if err != nil {
+		log.Printf("Redis Error getString for key %s\n%v\n\n", key, err.Error())
+		// return result, err
+	}
+	return result, err
+}
+
+func setString(key, doc string) error {
+	if err := rdb.Set(ctx, key, doc, DONT_EXPIRE).Err(); err != nil {
+		log.Printf("Redis Error setString for key %s, value: %v\n%v\n\n", key, doc, err.Error())
+		return err
 	}
 	return nil
 }
@@ -364,6 +410,45 @@ func GetGroupCount() (int64, error) {
 	}
 
 	return intCmd.Val(), nil
+}
+
+/*
+ * Entitlements specific functions
+ */
+func SetResourceTypes(doc string) error {
+	return setString(ENTITLEMENTS_RESOURCE_TYPES, doc)
+}
+
+func GetResourceTypes() (string, error) {
+	return getString(ENTITLEMENTS_RESOURCE_TYPES)
+}
+
+// func SetRoles(doc string) error {
+// 	return setString(ENTITLEMENTS_ROLES, doc)
+// }
+
+// func GetRoles() (string, error) {
+// 	return getString(ENTITLEMENTS_ROLES)
+// }
+
+func SetResource(name, doc string) error {
+	return hashSet(ENTITLEMENTS_RESOURCES, []string{name, doc})
+}
+
+func GetResources() (map[string]string, error) {
+	return hashGetAll(ENTITLEMENTS_RESOURCES)
+}
+
+func DeleteResource(name string) error {
+	return hashDeleteKey(ENTITLEMENTS_RESOURCES, name)
+}
+
+func SetSchema(doc string) error {
+	return setString(ENTITLEMENTS_SCHEMAS, doc)
+}
+
+func GetSchemas() (string, error) {
+	return getString(ENTITLEMENTS_SCHEMAS)
 }
 
 // func Test(user []byte) {

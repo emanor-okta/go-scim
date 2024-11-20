@@ -223,6 +223,46 @@ func handleSSFTransmitter(res http.ResponseWriter, req *http.Request) {
 	// TODO
 }
 
+func handleSSFTransmitterConfig(res http.ResponseWriter, _ *http.Request) {
+	// hardcode for now
+	// /ssf/transmitter/
+	log.Printf("Returning handleSSFTransmitterConfig")
+	hardeCoded := `
+{
+    "issuer": "https://gw.oktamanor.net",
+    "jwks_uri": "https://gw.oktamanor.net:8443/ssf/transmitter/keys",
+    "delivery_methods_supported": [
+        "urn:ietf:rfc:8935",
+        "https://schemas.openid.net/secevent/risc/delivery-method/push"
+    ],
+    "configuration_endpoint": "https://gw.oktamanor.net:8443/ssf/transmitter/stream"
+}
+	`
+	res.Header().Add("content-type", "application/json")
+	res.Write([]byte(hardeCoded))
+}
+
+func handleSSFTransmitterKeys(res http.ResponseWriter, _ *http.Request) {
+	// hardcode for now
+	// /ssf/transmitter/
+	log.Printf("Returning handleSSFTransmitterKeys")
+	hardeCoded := `
+{
+	"keys": [
+		{
+			"kid": "ssfTransmitterKey",
+			"kty": "RSA",
+			"e": "AQAB",
+			"use": "sig",
+			"n": "n1R11WgM0ngtgtW2bHOfSX6KsGrFTieo1UnQzQK0zDcxnqiOXAb4a7lbaehulfxxmFyaR3EFd1lCgQ1HucfASyRRbxLi0ibtlQTnxwQPnLEhdEi36qeGLnSduSEDUfJHf9-f5Qs38T5gQKM7-qtbF1GJpuYI_m3CTuta1re_pzEIuVE3qDxgoPAZlvx1GhEGJHv4Bf8lWzkpi1jy3kwXROSb1xSX-enhizSTVO63p4PmRPf1T8I4x-UgyEtd_J8NYhM38GCojrP64Bjhsvf3K7AWjS2UPa0F6YMIyrU2H0QS_OpwuPmBA4gkjpqWc6hzsiQhEdt0Jc7b9L1yUS3faw"
+		}
+	]
+}
+	`
+	res.Header().Add("content-type", "application/json")
+	res.Write([]byte(hardeCoded))
+}
+
 func handleSSFRecieverConfig(res http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
 		// POST

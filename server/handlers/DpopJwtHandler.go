@@ -108,7 +108,7 @@ func generate() string {
 	// flowParams = utils.Config.Dpop
 	//flowParams = parseCommandLineArgs()
 	if utils.Config.Dpop.FlowType == "jwt" {
-		result = generateAssertion(utils.Config.Dpop)
+		result = "{\"jwt\":\"" + generateAssertion(utils.Config.Dpop) + "\"}"
 		fmt.Printf("JWT Credential:\n%s\n", result)
 	} else if utils.Config.Dpop.Port == "" {
 		// client credentials or auth code was provided
@@ -369,12 +369,12 @@ func generateAssertion(fp utils.Dpop) string {
 		log.Fatalf("\nError, 'assertion_pem_file=<file>' option not present and needed for this flow\n")
 	}
 
-	pem, err := os.ReadFile(fp.AssertPem)
-	if err != nil {
-		log.Fatalf("\nError, Reading Key file for JWT Assertion, %+v\n", err)
-	}
+	// pem, err := os.ReadFile(fp.AssertPem)
+	// if err != nil {
+	// 	log.Fatalf("\nError, Reading Key file for JWT Assertion, %+v\n", err)
+	// }
 
-	privkey, _ := getKeys(pem)
+	privkey, _ := getKeys([]byte(fp.AssertPem))
 	assertion := AssertionPayload{
 		Aud: fmt.Sprintf("%s/oauth2/v1/token", fp.Issuer),
 		Iss: fp.ClientId,
@@ -411,8 +411,12 @@ func HandleCallbackReq(res http.ResponseWriter, req *http.Request) {
 }
 
 func HandleGenerateDpop(res http.ResponseWriter, req *http.Request) {
-	dpop := generateDpop()
-	res.Write([]byte(dpop))
+	// dpop := generateDpop()
+	// res.Write([]byte(dpop))
+	result := generate()
+	// m := map[string]string{"result": result}
+	// b, _ := json.Marshal(m)
+	res.Write([]byte(result))
 }
 
 func HandleDpop(res http.ResponseWriter, req *http.Request) {
@@ -431,14 +435,60 @@ func HandleDpopKeyUpload(res http.ResponseWriter, req *http.Request) {
 	//bytes, err := utils.GetBody(req)
 	err := req.ParseForm()
 	if err != nil {
-		log.Printf("HandleDpopKeyUpload: Error ParseMultipartForm, %s\n", err)
+		log.Printf("HandleDpopKeyUpload: Error ParseForm, %s\n", err)
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	switch req.RequestURI {
+	case "/dpop/jwt-config":
+		utils.Config.Dpop.FlowType = "jwt"
+	case "/dpop/service-config":
+		utils.Config.Dpop.FlowType = "service"
+	case "/dpop/auth-config":
+		utils.Config.Dpop.FlowType = "web"
+	default:
+		log.Printf("HandleDpopKeyUpload: unkown request URI: %s\n", req.RequestURI)
+	}
+
 	values := req.Form
 	for k, v := range values {
 		fmt.Printf("%s - %s\n", k, v[0])
+		switch k {
+		case "issuer":
+			utils.Config.Dpop.Issuer = v[0]
+		case "client-id":
+			utils.Config.Dpop.ClientId = v[0]
+		case "priv-key-enc":
+			// decodedKey, _ := base64.RawStdEncoding.DecodeString(v[0])
+			decodedKey, _ := base64.StdEncoding.DecodeString(v[0])
+			utils.Config.Dpop.AssertPem = string(decodedKey)
+		case "priv-key-id":
+			utils.Config.Dpop.AssertKid = v[0]
+		case "scopes":
+			utils.Config.Dpop.Scopes = v[0]
+		case "dpop-key-enc":
+			utils.Config.Dpop.DpopPem = v[0]
+		case "client-secret":
+			utils.Config.Dpop.ClientSecret = v[0]
+		case "service-endpoint", "auth-endpoint":
+			utils.Config.Dpop.ApiEndpoint = v[0]
+		case "service-method", "auth-method":
+			utils.Config.Dpop.ApiMethod = v[0]
+		case "auth-code":
+			utils.Config.Dpop.Code = v[0]
+		case "auth-code-verifier":
+			utils.Config.Dpop.CodeVerifier = v[0]
+		case "redirect-uri":
+			utils.Config.Dpop.RedirectURI = v[0]
+		case "port":
+			utils.Config.Dpop.Port = v[0]
+		default:
+			log.Printf("HandleDpopKeyUpload: unknown request param: %s - %s\n", k, v[0])
+		}
 	}
+
+	http.Redirect(res, req, "/dpop", http.StatusTemporaryRedirect)
 }
 func HandleDpopKeyUpload2(res http.ResponseWriter, req *http.Request) {
 	//bytes, err := utils.GetBody(req)

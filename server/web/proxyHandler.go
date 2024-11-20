@@ -298,7 +298,7 @@ func handleProxy(res http.ResponseWriter, req *http.Request) {
 			// fmt.Printf("byte length: %v, Content-Length: %v\n", len(b), req.ContentLength)
 			buf := bytes.Buffer{}
 			if err := json.Indent(&buf, b, "", "   "); err != nil {
-				log.Printf("handleProxy() - Error Formatting JSON: %s\n", err)
+				log.Printf("handleProxy() - Error Formatting JSON: %s\n%s\n", err, string(b))
 				m.RequestBody = string(b)
 			} else {
 				// TODO - might base this off of http header content-type
