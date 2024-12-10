@@ -14,21 +14,43 @@ type Reason struct {
 	En string `json:"en,omitempty"`
 }
 
+type Subject struct {
+	Format string `json:"format,omitempty"`
+	Email  string `json:"email,omitempty"`
+	Sub    string `json:"sub,omitempty"`
+	User   struct {
+		Format string `json:"format,omitempty"`
+		Email  string `json:"email,omitempty"`
+		Iss    string `json:"iss,omitempty"`
+	} `json:"user,omitempty"`
+	Device struct {
+		Format string `json:"format,omitempty"`
+		Email  string `json:"email,omitempty"`
+		Iss    string `json:"iss,omitempty"`
+	} `json:"device,omitempty"`
+	Tenant struct {
+		Format string `json:"format,omitempty"`
+		Email  string `json:"email,omitempty"`
+		Iss    string `json:"iss,omitempty"`
+	} `json:"tenant,omitempty"`
+}
+
 type EvtAttributes struct {
-	Current_ip            string            `json:"current_ip,omitempty"`
-	Current_user_agent    string            `json:"current_user_agent,omitempty"`
-	Event_timestamp       int64             `json:"event_timestamp,omitempty"`
-	Initiating_entity     string            `json:"initiating_entity,omitempty"`
-	Current_level         string            `json:"current_level,omitempty"`
-	Previous_level        string            `json:"previous_level,omitempty"`
-	Current_ip_address    string            `json:"current_ip_address,omitempty"`
-	Previous_ip_address   string            `json:"previous_ip_address,omitempty"`
-	Last_known_ip         string            `json:"last_known_ip,omitempty"`
-	Last_known_user_agent string            `json:"last_known_user_agent,omitempty"`
-	New_value             string            `json:"new-value,omitempty"`
-	Reason_admin          Reason            `json:"reason_admin,omitempty"`
-	Reason_user           Reason            `json:"reason_user,omitempty"`
-	Subject               map[string]string `json:"subject,omitempty"`
+	Current_ip            string `json:"current_ip,omitempty"`
+	Current_user_agent    string `json:"current_user_agent,omitempty"`
+	Event_timestamp       int64  `json:"event_timestamp,omitempty"`
+	Initiating_entity     string `json:"initiating_entity,omitempty"`
+	Current_level         string `json:"current_level,omitempty"`
+	Previous_level        string `json:"previous_level,omitempty"`
+	Current_ip_address    string `json:"current_ip_address,omitempty"`
+	Previous_ip_address   string `json:"previous_ip_address,omitempty"`
+	Last_known_ip         string `json:"last_known_ip,omitempty"`
+	Last_known_user_agent string `json:"last_known_user_agent,omitempty"`
+	New_value             string `json:"new-value,omitempty"`
+	Reason_admin          Reason `json:"reason_admin,omitempty"`
+	Reason_user           Reason `json:"reason_user,omitempty"`
+	// Subject               map[string]string `json:"subject,omitempty"`
+	Subject Subject `json:"subject,omitempty"`
 }
 
 // https://openid.net/specs/openid-caep-specification-1_0.html

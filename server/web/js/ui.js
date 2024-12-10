@@ -167,7 +167,12 @@ function populateNewGroup() {
   fetchTemplateData(location.origin + '/raw/group.json', document.getElementById("newGroupArea"));
 }
 
-function fetchTemplateData(url, element) {
+function defaultfetchTemplateDataCallback(data, element) {
+  console.log(JSON.stringify(data, null, "  "));
+  element.value = JSON.stringify(data, null, "  ");
+}
+
+function fetchTemplateData(url, element, callback) {
   fetch(url)
   .then(response => {
     if (!response.ok) {
@@ -176,8 +181,13 @@ function fetchTemplateData(url, element) {
     }
     response.json()
     .then(data => {
-      console.log(JSON.stringify(data, null, "  "));
-      element.value = JSON.stringify(data, null, "  ");
+      //console.log(JSON.stringify(data, null, "  "));
+      //element.value = JSON.stringify(data, null, "  ");
+      if (callback === undefined) {
+        defaultfetchTemplateDataCallback(data, element);
+      } else {
+        callback(data, element);
+      }
     });
   }).catch(err => {
     console.log(err);

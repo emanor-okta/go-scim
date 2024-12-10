@@ -109,6 +109,7 @@ func StartServer(c *utils.Configuration) {
 	if config.Services.Ssf {
 		// config.Server.Allowed_ips["[::1]"] = "blank"
 		http.HandleFunc("/ssf/receiver", utils.AddMiddleware(handleSSFReq, commonScimMiddlewares...))
+		http.HandleFunc("/ssf/globalLogout", utils.AddMiddleware(handleGlobalLogout, commonScimMiddlewares...))
 		// http.HandleFunc("/ssf/receiver", handleSSFReq)
 		http.HandleFunc("/ssf/receiver/app", utils.AddMiddleware(handleSSFReciever, commonScimMiddlewares...))
 		http.HandleFunc("/ssf/receiver/app/embed", utils.AddMiddleware(handleSSFRecieverAppEmbed, commonScimMiddlewares...))
@@ -119,6 +120,8 @@ func StartServer(c *utils.Configuration) {
 		http.HandleFunc("/ssf/transmitter/app", utils.AddMiddleware(handleSSFTransmitter, commonScimMiddlewares...))
 		http.HandleFunc("/ssf/transmitter/keys", utils.AddMiddleware(handleSSFTransmitterKeys, commonScimMiddlewares...))
 		http.HandleFunc("/ssf/transmitter/.well-known/sse-configuration", utils.AddMiddleware(handleSSFTransmitterConfig, commonScimMiddlewares...))
+		http.HandleFunc("/ssf/transmitter/event/", utils.AddMiddleware(handleGetSecurityEventType, scimMiddlewares...))
+		http.HandleFunc("/ssf/transmitter/send", utils.AddMiddleware(handleSendSecurityEvents, scimMiddlewares...))
 	}
 
 	// Hooks Handlers (no handlers in webHandlers.go)

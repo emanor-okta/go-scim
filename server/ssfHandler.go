@@ -7,11 +7,15 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/gorilla/sessions"
 	"github.com/gorilla/websocket"
 	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jws"
 
 	"github.com/emanor-okta/go-scim/types"
 	"github.com/emanor-okta/go-scim/types/ssf"
@@ -20,6 +24,7 @@ import (
 
 // const TokenCall = "client_id=%s&client_secret=%s&grant_type=authorization_code&redirect_uri=%s&code=%s"
 // const AuthorizeCall = "client_id=%s&response_type=code&scope=%s&redirect_uri=%s&state=%s"
+const success = 0
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -53,6 +58,82 @@ func init() {
 	wsClientConnected = false
 }
 
+func handleGlobalLogout(res http.ResponseWriter, req *http.Request) {
+	log.Printf("handleGlobalLogout: Received Logout Request:\n%+v\n", req)
+	if req.Method != http.MethodPost {
+		res.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	authHeaderParts := strings.Split(req.Header.Get("Authorization"), " ")
+	if strings.ToLower(authHeaderParts[0]) != "bearer" {
+		log.Printf("handleGlobalLogout: Received Request without bearer token:\n%+v\n", req.Header.Get("Authorization"))
+		res.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	_, result := verify(authHeaderParts[1])
+	if result != success {
+		res.WriteHeader(result)
+		return
+	}
+
+	b, err := getBody(req)
+	fmt.Printf("handleGlobalLogout: Body Received:\n%s\n", string(b))
+	if err != nil {
+		log.Printf("handleGlobalLogout: Error getting POST body: %v\n", err)
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// var m map[string]interface{}
+	var universalLogout struct {
+		Sub_id struct {
+			Format string `json:"format,omitempty"`
+			Sub    string `json:"sub,omitempty"`
+			Iss    string `json:"iss,omitempty"`
+			Email  string `json:"email,omitempty"`
+		} `json:"sub_id,omitempty"`
+	}
+	if err = json.Unmarshal(b, &universalLogout); err != nil {
+		fmt.Printf("handleGlobalLogout: Invalid Body Received:\n%s\n", string(b))
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	fmt.Printf("%+v\n", universalLogout)
+	// {"sub_id":{"format":"iss_sub","iss":"https://emanor-oie.oktapreview.com","sub":"00u72c3w7p0pOSvuj1d7"}}
+	// {"sub_id":{"format":"email","email":"emanor.okta2@gmail.com"}}
+	events := ssf.Events{}
+	events.SessionRevoked.Event_timestamp = time.Now().UnixMilli() // timestamp would be in bearer JWT, just make it now
+	// events.SessionRevoked.Subject = map[string]string{}
+	events.SessionRevoked.Subject = ssf.Subject{}
+	if universalLogout.Sub_id.Format == "email" {
+		// events.SessionRevoked.Subject["sub"] = universalLogout.Sub_id.Email
+		events.SessionRevoked.Subject.Sub = universalLogout.Sub_id.Email
+	} else {
+		// events.SessionRevoked.Subject["sub"] = universalLogout.Sub_id.Sub
+		events.SessionRevoked.Subject.Sub = universalLogout.Sub_id.Sub
+	}
+
+	parseEvents(events)
+
+	// send to admin app to display
+	sendSSFRecieverWebSocketMessage(universalLogout)
+
+	// if events.SessionRevoked.Event_timestamp > 0 {
+	// 	log.Println("Received Session Revoke SecEvt")
+	// 	subject := events.SessionRevoked.Subject
+	// 	for k, v := range subject {
+	// 		fmt.Printf("subject attribute: %s, value: %s\n", k, v)
+	// 		if k == "sub" {
+	// 			// check sessions Map for user and remove if present
+	// 			for sessionId, sessionV := range sessionsMap {
+	// 				if v == sessionV.UUID {
+
+	res.WriteHeader(http.StatusAccepted)
+}
+
 func handleSSFReq(res http.ResponseWriter, req *http.Request) {
 	log.Printf("handleSSFReq: Received SSF Request:\n%+v\n", req)
 
@@ -66,40 +147,45 @@ func handleSSFReq(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		jwtParts := strings.Split(string(b), ".")
-		if len(jwtParts) < 3 {
-			log.Printf("handleSSFReq: Invalid JWT Received")
-			fmt.Printf("%+v\n", jwtParts)
-			res.WriteHeader(http.StatusUnauthorized)
-			return
-		}
+		// jwtParts := strings.Split(string(b), ".")
+		// if len(jwtParts) < 3 {
+		// 	log.Printf("handleSSFReq: Invalid JWT Received")
+		// 	fmt.Printf("%+v\n", jwtParts)
+		// 	res.WriteHeader(http.StatusUnauthorized)
+		// 	return
+		// }
 
-		decodedHeader, _ := base64.RawStdEncoding.DecodeString(jwtParts[0])
-		decodedBody, _ := base64.RawStdEncoding.DecodeString(jwtParts[1])
-		var secEvtTokenJWTHeader ssf.SecEvtTokenJWTHeader
-		if err := json.Unmarshal(decodedHeader, &secEvtTokenJWTHeader); err != nil {
-			log.Printf("handleSSFReq: Error decoding JWT Header: %s, err: %v\n", jwtParts[0], err)
-			res.WriteHeader(http.StatusForbidden)
-			return
-		}
+		// decodedHeader, _ := base64.RawStdEncoding.DecodeString(jwtParts[0])
+		// decodedBody, _ := base64.RawStdEncoding.DecodeString(jwtParts[1])
+		// var secEvtTokenJWTHeader ssf.SecEvtTokenJWTHeader
+		// if err := json.Unmarshal(decodedHeader, &secEvtTokenJWTHeader); err != nil {
+		// 	log.Printf("handleSSFReq: Error decoding JWT Header: %s, err: %v\n", jwtParts[0], err)
+		// 	res.WriteHeader(http.StatusForbidden)
+		// 	return
+		// }
 
-		var secEvtTokenJWTBody ssf.SecEvtTokenJWTBody
-		if err := json.Unmarshal(decodedBody, &secEvtTokenJWTBody); err != nil {
-			log.Printf("handleSSFReq: Error decoding JWT Body: %s, err: %v\n", jwtParts[1], err)
-			res.WriteHeader(http.StatusForbidden)
-			return
-		}
+		// var secEvtTokenJWTBody ssf.SecEvtTokenJWTBody
+		// if err := json.Unmarshal(decodedBody, &secEvtTokenJWTBody); err != nil {
+		// 	log.Printf("handleSSFReq: Error decoding JWT Body: %s, err: %v\n", jwtParts[1], err)
+		// 	res.WriteHeader(http.StatusForbidden)
+		// 	return
+		// }
 
-		// Verify JWT
-		key, ok := utils.GetKeyForIDFromIssuer(secEvtTokenJWTHeader.Kid, secEvtTokenJWTBody.Iss)
-		if !ok {
-			res.WriteHeader(http.StatusUnauthorized)
-			return
-		}
+		// // Verify JWT
+		// key, ok := utils.GetKeyForIDFromIssuer(secEvtTokenJWTHeader.Kid, secEvtTokenJWTBody.Iss)
+		// if !ok {
+		// 	res.WriteHeader(http.StatusUnauthorized)
+		// 	return
+		// }
 
-		ok = utils.VerifyJwt(b, key, jwa.RS256) // Just assume RS256, don't think Okta will use anything else
-		if !ok {
-			res.WriteHeader(http.StatusUnauthorized)
+		// ok = utils.VerifyJwt(b, key, jwa.RS256) // Just assume RS256, don't think Okta will use anything else
+		// if !ok {
+		// 	res.WriteHeader(http.StatusUnauthorized)
+		// 	return
+		// }
+		secEvtTokenJWTBody, result := verify(string(b))
+		if result != success {
+			res.WriteHeader(result)
 			return
 		}
 
@@ -116,6 +202,42 @@ func handleSSFReq(res http.ResponseWriter, req *http.Request) {
 	}
 
 	res.WriteHeader(http.StatusAccepted)
+}
+
+func verify(jwt string) (ssf.SecEvtTokenJWTBody, int) {
+	var secEvtTokenJWTHeader ssf.SecEvtTokenJWTHeader
+	var secEvtTokenJWTBody ssf.SecEvtTokenJWTBody
+	jwtParts := strings.Split(jwt, ".")
+	if len(jwtParts) < 3 {
+		log.Printf("verify: Invalid JWT Received")
+		fmt.Printf("%+v\n", jwtParts)
+		return secEvtTokenJWTBody, http.StatusUnauthorized
+	}
+
+	decodedHeader, _ := base64.RawStdEncoding.DecodeString(jwtParts[0])
+	decodedBody, _ := base64.RawStdEncoding.DecodeString(jwtParts[1])
+	if err := json.Unmarshal(decodedHeader, &secEvtTokenJWTHeader); err != nil {
+		log.Printf("verify: Error decoding JWT Header: %s, err: %v\n", jwtParts[0], err)
+		return secEvtTokenJWTBody, http.StatusForbidden
+	}
+
+	if err := json.Unmarshal(decodedBody, &secEvtTokenJWTBody); err != nil {
+		log.Printf("verify: Error decoding JWT Body: %s, err: %v\n", jwtParts[1], err)
+		return secEvtTokenJWTBody, http.StatusForbidden
+	}
+
+	// Verify JWT
+	key, ok := utils.GetKeyForIDFromIssuer(secEvtTokenJWTHeader.Kid, secEvtTokenJWTBody.Iss)
+	if !ok {
+		return secEvtTokenJWTBody, http.StatusUnauthorized
+	}
+
+	ok = utils.VerifyJwt([]byte(jwt), key, jwa.RS256) // Just assume RS256, don't think Okta will use anything else
+	if !ok {
+		return secEvtTokenJWTBody, http.StatusUnauthorized
+	}
+
+	return secEvtTokenJWTBody, success
 }
 
 func parseEvents(events ssf.Events) {
@@ -136,46 +258,63 @@ func parseEvents(events ssf.Events) {
 	}
 	if events.SessionRevoked.Event_timestamp > 0 {
 		log.Println("Received Session Revoke SecEvt")
-		subject := events.SessionRevoked.Subject
-		for k, v := range subject {
-			fmt.Printf("subject attribute: %s, value: %s\n", k, v)
-			if k == "sub" {
-				// check sessions Map for user and remove if present
-				for sessionId, sessionV := range sessionsMap {
-					if v == sessionV.UUID {
-						log.Printf("!!!!!! SECURITY EVENT !!!!!!: Session Revoked for User: %s, id: %s, removing app session\n", sessionV.Username, sessionV.UUID)
-						delete(sessionsMap, sessionId)
-					}
-				}
+		fmt.Printf("subject attributes: %+v\n", events.SessionRevoked.Subject)
+		for sessionId, sessionV := range sessionsMap {
+			if events.SessionRevoked.Subject.Sub == sessionV.UUID {
+				log.Printf("!!!!!! SECURITY EVENT !!!!!!: Session Revoked for User: %s, id: %s, removing app session\n", sessionV.Username, sessionV.UUID)
+				delete(sessionsMap, sessionId)
 			}
 		}
+
+		// subject := events.SessionRevoked.Subject
+		// for k, v := range subject {
+		// 	fmt.Printf("subject attribute: %s, value: %s\n", k, v)
+		// 	if k == "sub" {
+		// 		// check sessions Map for user and remove if present
+		// 		for sessionId, sessionV := range sessionsMap {
+		// 			if v == sessionV.UUID {
+		// 				log.Printf("!!!!!! SECURITY EVENT !!!!!!: Session Revoked for User: %s, id: %s, removing app session\n", sessionV.Username, sessionV.UUID)
+		// 				delete(sessionsMap, sessionId)
+		// 			}
+		// 		}
+		// 	}
+		// }
 	}
 	if events.CredentialChanged.Event_timestamp > 0 {
 		log.Println("Received Credential Changed SecEvt")
-		subject := events.CredentialChanged.Subject
-		if events.CredentialChanged.Change_type != "create" {
-			// change_type is "delete", "update", or "revoke"
-			for k, v := range subject {
-				fmt.Printf("subject attribute: %s, value: %s\n", k, v)
-				if k == "sub" {
-					// check sessions Map for user and remove if present
-					for k2, sessionV := range sessionsMap {
-						if v == sessionV.UUID {
-							log.Printf("!!!!!! SECURITY EVENT !!!!!!: Credential Changed for User: %s, id: %s, Force Re-Authentication\n", sessionV.Username, sessionV.UUID)
-							sessionV.ForceReAuth = true
-							sessionsMap[k2] = sessionV
-						}
-					}
-				}
+		fmt.Printf("subject attributes: %+v\n", events.CredentialChanged.Subject)
+		for sessionId, sessionV := range sessionsMap {
+			if events.CredentialChanged.Subject.Sub == sessionV.UUID {
+				log.Printf("!!!!!! SECURITY EVENT !!!!!!: Credential Changed for User: %s, id: %s, Force Re-Authentication\n", sessionV.Username, sessionV.UUID)
+				sessionV.ForceReAuth = true
+				sessionsMap[sessionId] = sessionV
 			}
 		}
+
+		// subject := events.CredentialChanged.Subject
+		// if events.CredentialChanged.Change_type != "create" {
+		// 	// change_type is "delete", "update", or "revoke"
+		// 	for k, v := range subject {
+		// 		fmt.Printf("subject attribute: %s, value: %s\n", k, v)
+		// 		if k == "sub" {
+		// 			// check sessions Map for user and remove if present
+		// 			for k2, sessionV := range sessionsMap {
+		// 				if v == sessionV.UUID {
+		// 					log.Printf("!!!!!! SECURITY EVENT !!!!!!: Credential Changed for User: %s, id: %s, Force Re-Authentication\n", sessionV.Username, sessionV.UUID)
+		// 					sessionV.ForceReAuth = true
+		// 					sessionsMap[k2] = sessionV
+		// 				}
+		// 			}
+		// 		}
+		// 	}
+		// }
 	}
 }
 
 func handleSSFReciever(res http.ResponseWriter, req *http.Request) {
 	err := tpl.ExecuteTemplate(res, "ssfreceiver.gohtml", struct{ utils.Services }{config.Services})
 	if err != nil {
-		log.Printf("handleSSFReciever: %+v\n", err)
+		log.Printf("handleSSFReciever Error: %+v\n", err)
 	}
 }
 
@@ -220,7 +359,93 @@ func handleSSFRecieverAppEmbed(res http.ResponseWriter, req *http.Request) {
 }
 
 func handleSSFTransmitter(res http.ResponseWriter, req *http.Request) {
-	// TODO
+	err := tpl.ExecuteTemplate(res, "ssftransmitter.gohtml", struct{ utils.Services }{config.Services})
+	if err != nil {
+		log.Printf("handleSSFTransmitter Error: %+v\n", err)
+	}
+}
+
+func handleGetSecurityEventType(res http.ResponseWriter, req *http.Request) {
+	paths := strings.Split(strings.Split(req.RequestURI, "?")[0], "/")
+	resource := paths[len(paths)-1]
+	var eventJson []byte
+	var err error
+	switch resource {
+	case "session-revoke":
+		eventJson, err = os.ReadFile("./server/web/raw/securityEvents/sessionRevoke.txt")
+	default:
+		eventJson = []byte("{}")
+	}
+
+	if err != nil {
+		log.Printf("handleGetSecurityEventType Error: %+v\n", err)
+		eventJson = []byte("{}")
+	}
+	res.Write(eventJson)
+}
+
+func handleSendSecurityEvents(res http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		log.Printf("handleSendSecurityEvents Error, invalid Method: %s\n", req.Method)
+		res.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	data, err := utils.GetBody(req)
+	if err != nil {
+		log.Printf("handleSendSecurityEvents Error: %+v\n", err)
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	fmt.Printf("%s\n", string(data))
+	//var secEvtTokenBody ssf.SecEvtTokenJWTBody
+	var events map[string]interface{}
+	err = json.Unmarshal(data, &events)
+	if err != nil {
+		log.Printf("handleSendSecurityEvents Error Unmarshalling Events: %+v\n", err)
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// secEvtJWTHeader := ssf.SecEvtTokenJWTHeader{
+	// 	Kid: "ssfTransmitterKey",
+	// 	Typ: "secevent+jwt",
+	// 	Alg: "RS256",
+	// }
+	privKeyPem := `-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCfVHXVaAzSeC2C
+
+zqGmfDaixMZoQYf0amSb9Oth
+-----END PRIVATE KEY-----`
+
+	privkey, err := jwk.ParseKey([]byte(privKeyPem), jwk.WithPEM(true))
+	if err != nil {
+		log.Fatalf("\nfailed to parse JWK: %s\n", err)
+	}
+
+	// pubkey, err := jwk.PublicKeyOf(privkey)
+	if err != nil {
+		log.Fatalf("\nfailed to get public key: %s\n", err)
+	}
+
+	hdrs := jws.NewHeaders()
+	hdrs.Set("typ", "secevent+jwt")
+	hdrs.Set("alg", "RS256")
+	hdrs.Set("kid", "ssfTransmitterKey")
+	// hdrs.Set("jwk", pubkey)
+
+	// if secEvtTokenBody.Events.SessionRevoked.Event_timestamp < 0 {
+	// 	secEvtTokenBody.Events.SessionRevoked =
+	// }
+
+	signVerifyOptions := jws.WithKey(jwa.RS256, privkey, jws.WithProtectedHeaders(hdrs))
+	jwtPayloadBytes, _ := json.Marshal(events)
+	buf, err := jws.Sign(jwtPayloadBytes, signVerifyOptions)
+	if err != nil {
+		log.Fatalf("\nFailed to signJWT: %+v, with options: %+v\n", events, signVerifyOptions)
+	}
+	fmt.Printf("%s\n", string(buf))
+	// fmt.Printf("%+v\n", secEvtTokenBody.Events.SessionRevoked.Event_timestamp)
 }
 
 func handleSSFTransmitterConfig(res http.ResponseWriter, _ *http.Request) {

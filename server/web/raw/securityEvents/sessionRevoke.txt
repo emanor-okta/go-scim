@@ -1,0 +1,17 @@
+{
+  "https://schemas.openid.net/secevent/caep/event-type/session-revoked": {
+        "subject": {
+          "user": {
+            "format": "email",
+            "email": "emanor.okta2@gmail.com"
+          }
+        },
+        "current_level": "high",
+        "previous_level": "low",
+        "initiating_entity": "policy",
+        "reason_admin": {
+          "en": "Session ended"
+        },
+        "event_timestamp": -1
+  }
+}

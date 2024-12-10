@@ -70,7 +70,6 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 
 		lr := buildListResponse(users)
 		reqFilter.UserGetResponse(&lr, fmt.Sprintf("GET %s  -  Response", path))
-
 		j, err := json.Marshal(&lr)
 		if err != nil {
 			log.Fatalf("Error Marshalling ListResponse: %v\n", err)

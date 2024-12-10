@@ -194,6 +194,9 @@ func sendToUI(hookRequest map[string]interface{}, hookResponse []byte, hookType 
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
+	// time.Sleep(time.Second * 2)
+	// res.WriteHeader(http.StatusInternalServerError)
+
 }
 
 func LoadDefaultResponses() {

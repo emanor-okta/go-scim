@@ -35,4 +35,4 @@ scim:
     users_endpoint: "/goscim/scim/v2/Users"
     groups_endpoint: "/goscim/scim/v2/Groups"
 # build: "v1.22.001"
-build: "v1.34.004"
+build: "v1.34.010"
