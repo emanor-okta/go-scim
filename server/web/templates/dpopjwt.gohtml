@@ -18,20 +18,7 @@
         </div>
         <div class="col">
           <button type="button" class="btn btn-outline-dark me-2" onclick="generateJWT()">Generate</button>
-        </div>
-        {{/* <div class="col">
-          <button type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#configureHookModal" data-bs-hooktype="registration">Registration Hook</button>
-        </div>
-        <div class="col">
-          <button type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#configureHookModal" data-bs-hooktype="telephony">Telephony Hook</button>
-        </div>
-        <div class="col">
-          <button type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#configureHookModal" data-bs-hooktype="saml">SAML Hook</button>
-        </div>
-        <div class="col">
-          <button type="button" class="btn btn-outline-dark me-2" data-bs-toggle="modal" data-bs-target="#configureHookModal" data-bs-hooktype="token">Token Hook</button>
-        </div> */}}
-        
+        </div>        
       </div>
     </div> 
 
@@ -46,105 +33,134 @@
 
             <ul class="nav nav-tabs" id="myTab" role="tablist">
               <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="jwt-tab" data-bs-toggle="tab" data-bs-target="#jwt" type="button" role="tab" aria-controls="jwt" aria-selected="true">JWT</button>
+                <button class='nav-link  {{if eq .Dpop.FlowType "jwt"}}active{{end}}' id="jwt-tab" data-bs-toggle="tab" data-bs-target="#jwt" type="button" role="tab" aria-controls="jwt" aria-selected='{{if eq .Dpop.FlowType "jwt"}}true{{else}}false{{end}}'>JWT</button>
               </li>
               <li class="nav-item" role="presentation">
-                <button class="nav-link" id="service-tab" data-bs-toggle="tab" data-bs-target="#service" type="button" role="tab" aria-controls="service" aria-selected="false">Service App</button>
+                <button class='nav-link {{if eq .Dpop.FlowType "service"}}active{{end}}' id="service-tab" data-bs-toggle="tab" data-bs-target="#service" type="button" role="tab" aria-controls="service" aria-selected='{{if eq .Dpop.FlowType "service"}}true{{else}}false{{end}}'>Service App</button>
               </li>
               <li class="nav-item" role="presentation">
-                <button class="nav-link" id="auth-tab" data-bs-toggle="tab" data-bs-target="#auth" type="button" role="tab" aria-controls="auth" aria-selected="false">Auth Code</button>
+                <button class='nav-link {{if eq .Dpop.FlowType "web"}}active{{end}}' id="auth-tab" data-bs-toggle="tab" data-bs-target="#auth" type="button" role="tab" aria-controls="auth" aria-selected='{{if eq .Dpop.FlowType "web"}}true{{else}}false{{end}}'>Auth Code</button>
               </li>
             </ul>
 
             <div class="tab-content" id="myTabContent">
-              <div class="tab-pane fade show active" id="jwt" role="tabpanel" aria-labelledby="jwt-tab">
+
+              <div class='tab-pane fade {{if eq .Dpop.FlowType "jwt"}}active show{{end}}' id="jwt" role="tabpanel" aria-labelledby="jwt-tab">
                 <form action="/dpop/jwt-config" method="post">
                   <div class="mb-3">
                     <label for="jwt-issuer" class="col-form-label">Issuer:</label>
-                    <input type="text" name="issuer" class="form-control" id="jwt-issuer" placeholder="<required>">
+                    <input type="text" name="issuer" class="form-control" id="jwt-issuer" placeholder="<required>" {{if .Dpop.Issuer}}value="{{.Dpop.Issuer}}"{{end}}>
                     <label for="jwt-client-id" class="col-form-label">Client id:</label>
-                    <input type="text" name="client-id" class="form-control" id="jwt-client-id" placeholder="<required>">
+                    <input type="text" name="client-id" class="form-control" id="jwt-client-id" placeholder="<required>" {{if .Dpop.ClientId}}value="{{.Dpop.ClientId}}"{{end}}>
                     <div>
                       <label for="jwt-priv-key" class="col-form-label">Private key:</label>
-                      <input type="text" name="priv-key" class="form-control" id="jwt-priv-key" placeholder="<required>" ondrop="drop(event)" ondragover="dragOverHandler(event);">
+                      <div class="row justify-content-center align-items-center">
+                        <div class="col">
+                          <input type="text" name="priv-key" class="form-control" id="jwt-priv-key" placeholder="<required>" ondrop="drop(event)" ondragover="dragOverHandler(event);" {{if .Dpop.AssertPem}}value="Key Set" disabled="true"{{end}}>
+                        </div>
+                        {{if .Dpop.AssertPem}}
+                        <div id="priv-key-button-div" class="col-md-auto">
+                          <button type="button" class="btn btn-sm btn-danger" onclick="removeKey('private');return false">Remove Key</button>
+                        </div>
+                        {{end}}
+                      </div>
                       <input type="text" name="priv-key-enc" class="form-control" id="jwt-priv-key-enc" hidden>
                     </div>
                     <hr/>
                     <label for="jwt-priv-key-id" class="col-form-label">Private key id:</label>
-                    <input type="text" name="priv-key-id" class="form-control" id="jwt-priv-key-id" placeholder="<optional>">
+                    <input type="text" name="priv-key-id" class="form-control" id="jwt-priv-key-id" placeholder="<optional>" {{if .Dpop.AssertKid}}value="{{.Dpop.AssertKid}}"{{end}}>
                     
                     <input id="jwt-submit" type="submit" hidden/>
                   </div>
                 </form>
               </div>
 
-              <div class="tab-pane fade" id="service" role="tabpanel" aria-labelledby="service-tab">
+              <div class='tab-pane fade {{if eq .Dpop.FlowType "service"}}active show{{end}}' id="service" role="tabpanel" aria-labelledby="service-tab">
                 <form action="/dpop/service-config" method="post">
                   <div class="mb-3">
                     <label for="service-issuer" class="col-form-label">Issuer:</label>
-                    <input type="text" name="issuer" class="form-control" id="service-issuer" placeholder="<required>">
+                    <input type="text" name="issuer" class="form-control" id="service-issuer" placeholder="<required>" {{if .Dpop.Issuer}}value="{{.Dpop.Issuer}}"{{end}}>
                     <label for="service-client-id" class="col-form-label">Client id:</label>
-                    <input type="text" name="client-id" class="form-control" id="service-client-id" placeholder="<required>">
+                    <input type="text" name="client-id" class="form-control" id="service-client-id" placeholder="<required>" {{if .Dpop.ClientId}}value="{{.Dpop.ClientId}}"{{end}}>
                     <label for="service-scopes" class="col-form-label">Scopes:</label>
-                    <input type="text" name="scopes" class="form-control" id="service-scopes" placeholder="<required>">
+                    <input type="text" name="scopes" class="form-control" id="service-scopes" placeholder="<required>" {{if .Dpop.Scopes}}value="{{.Dpop.Scopes}}"{{end}}>
                     <hr/>
                     <label for="service-client-secret" class="col-form-label">Client secret:</label>
-                    <input type="text" name="client-secret" class="form-control" id="service-client-secret" placeholder="<optional>">
+                    <input type="text" name="client-secret" class="form-control" id="service-client-secret" placeholder="<optional>" {{if .Dpop.ClientSecret}}value="{{.Dpop.ClientSecret}}"{{end}}>
                     
                     <div >
                       <label for="service-priv-key" class="col-form-label">Private key:</label>
-                      <input type="text" name="priv-key" class="form-control" id="service-priv-key" placeholder="<optional>" ondrop="drop(event)" ondragover="dragOverHandler(event);">
+                      <div class="row justify-content-center align-items-center">
+                        <div class="col">
+                          <input type="text" name="priv-key" class="form-control" id="service-priv-key" placeholder="<optional>" ondrop="drop(event)" ondragover="dragOverHandler(event);" {{if .Dpop.AssertPem}}value="Key Set" disabled="true"{{end}}>
+                        </div>
+                        {{if .Dpop.AssertPem}}
+                        <div id="service-key-button-div" class="col-md-auto">
+                          <button type="button" class="btn btn-sm btn-danger" onclick="removeKey('private');return false">Remove Key</button>
+                        </div>
+                        {{end}}
+                      </div>  
                       <input type="text" name="priv-key-enc" class="form-control" id="service-priv-key-enc" hidden>
                     </div>
                     <label for="service-priv-key-id" class="col-form-label">Private key id:</label>
-                    <input type="text" name="priv-key-id" class="form-control" id="service-priv-key-id" placeholder="<optional>">
+                    <input type="text" name="priv-key-id" class="form-control" id="service-priv-key-id" placeholder="<optional>" {{if .Dpop.AssertKid}}value="{{.Dpop.AssertKid}}"{{end}}>
                     
                     <div  >
                       <label for="service-dpop-key" class="col-form-label">DPoP key:</label>
-                      <input type="text" name="dpop-key" class="form-control" id="service-dpop-key" placeholder="<optional>" ondrop="drop(event)" ondragover="dragOverHandler(event);">
+                      <div class="row justify-content-center align-items-center">
+                        <div class="col">
+                          <input type="text" name="dpop-key" class="form-control" id="service-dpop-key" placeholder="<optional>" ondrop="drop(event)" ondragover="dragOverHandler(event);" {{if .Dpop.DpopPem}}value="Key Set" disabled="true"{{end}}>
+                       </div>
+                        {{if .Dpop.DpopPem}}
+                        <div id="dpop-key-button-div" class="col-md-auto">
+                          <button type="button" class="btn btn-sm btn-danger" onclick="removeKey('dpop');return false">Remove Key</button>
+                        </div>
+                        {{end}}
+                      </div>
                       <input type="text" name="dpop-key-enc" class="form-control" id="service-dpop-key-enc" hidden>
                     </div>
 
                     <label for="service-endpoint" class="col-form-label">API Endpoint:</label>
-                    <input type="text" name="service-endpoint" class="form-control" id="service-endpoint" placeholder="<optional>">
+                    <input type="text" name="service-endpoint" class="form-control" id="service-endpoint" placeholder="<optional>" {{if .Dpop.ApiEndpoint}}value="{{.Dpop.ApiEndpoint}}"{{end}}>
                     <label for="service-method" class="col-form-label">API method:</label>
-                    <input type="text" name="service-method" class="form-control" id="service-method" placeholder="<optional>">
+                    <input type="text" name="service-method" class="form-control" id="service-method" placeholder="<optional>" {{if .Dpop.ApiMethod}}value="{{.Dpop.ApiMethod}}"{{end}}>
 
                     <input id="service-submit" type="submit" hidden/>
                   </div>
                 </form>
               </div>
 
-              <div class="tab-pane fade" id="auth" role="tabpanel" aria-labelledby="auth-tab">
+              <div class='tab-pane fade {{if eq .Dpop.FlowType "web"}}active show{{end}}' id="auth" role="tabpanel" aria-labelledby="auth-tab">
                 <form action="/dpop/auth-config" method="post">
                   <div class="mb-3">
                     <label for="auth-issuer" class="col-form-label">Issuer:</label>
-                    <input type="text" name="issuer" class="form-control" id="auth-issuer" placeholder="<required>">
+                    <input type="text" name="issuer" class="form-control" id="auth-issuer" placeholder="<required>" {{if .Dpop.Issuer}}value="{{.Dpop.Issuer}}"{{end}}>
                     <label for="auth-client-id" class="col-form-label">Client id:</label>
-                    <input type="text" name="client-id" class="form-control" id="auth-client-id" placeholder="<required>">
+                    <input type="text" name="client-id" class="form-control" id="auth-client-id" placeholder="<required>" {{if .Dpop.ClientId}}value="{{.Dpop.ClientId}}"{{end}}>
                     <label for="auth-scopes" class="col-form-label">Scopes:</label>
-                    <input type="text" name="scopes" class="form-control" id="auth-scopes" placeholder="<required>">
+                    <input type="text" name="scopes" class="form-control" id="auth-scopes" placeholder="<required>" {{if .Dpop.Scopes}}value="{{.Dpop.Scopes}}"{{end}}>
                     <hr/>
                     <label for="auth-client-secret" class="col-form-label">Client secret:</label>
-                    <input type="text" name="client-secret" class="form-control" id="auth-client-secret" placeholder="<optional>">
+                    <input type="text" name="client-secret" class="form-control" id="auth-client-secret" placeholder="<optional>" {{if .Dpop.ClientSecret}}value="{{.Dpop.ClientSecret}}"{{end}}>
                     <label for="auth-code" class="col-form-label">Authorization Code:</label>
-                    <input type="text" name="auth-code" class="form-control" id="auth-code" placeholder="<optional>">
+                    <input type="text" name="auth-code" class="form-control" id="auth-code" placeholder="<optional>" {{if .Dpop.Code}}value="{{.Dpop.Code}}"{{end}}>
                     <label for="auth-code-verifier" class="col-form-label">Code Verifier:</label>
-                    <input type="text" name="auth-code-verifier" class="form-control" id="auth-code-verifier" placeholder="<optional>">
+                    <input type="text" name="auth-code-verifier" class="form-control" id="auth-code-verifier" placeholder="<optional>" {{if .Dpop.CodeVerifier}}value="{{.Dpop.CodeVerifier}}"{{end}}>
                     <label for="auth-redirect-uri" class="col-form-label">Redirect URI:</label>
-                    <input type="text" name="redirect-uri" class="form-control" id="auth-redirect-uri" placeholder="<optional>">
+                    <input type="text" name="redirect-uri" class="form-control" id="auth-redirect-uri" placeholder="<optional>" {{if .Dpop.RedirectURI}}value="{{.Dpop.RedirectURI}}"{{end}}>
                     <label for="auth-port" class="col-form-label">Port:</label>
-                    <input type="text" name="port" class="form-control" id="auth-port" placeholder="<optional>">
+                    <input type="text" name="port" class="form-control" id="auth-port" placeholder="<optional>" {{if .Dpop.Port}}value="{{.Dpop.Port}}"{{end}}>
            
                     <label for="auth-endpoint" class="col-form-label">API Endpoint:</label>
-                    <input type="text" name="auth-endpoint" class="form-control" id="auth-endpoint" placeholder="<optional>">
+                    <input type="text" name="auth-endpoint" class="form-control" id="auth-endpoint" placeholder="<optional>" {{if .Dpop.ApiEndpoint}}value="{{.Dpop.ApiEndpoint}}"{{end}}>
                     <label for="auth-method" class="col-form-label">API method:</label>
-                    <input type="text" name="auth-method" class="form-control" id="auth-method" placeholder="<optional>">
+                    <input type="text" name="auth-method" class="form-control" id="auth-method" placeholder="<optional>" {{if .Dpop.ApiMethod}}value="{{.Dpop.ApiMethod}}"{{end}}>
 
                     <input id="auth-submit" type="submit" hidden/>
                   </div>
                 </form>
               </div>
+              
             </div>
 
                   
@@ -224,7 +240,7 @@
           () => {
             //console.log(reader.result);
             document.getElementById(keyElementEnc).value = Base64.encode(reader.result);
-            document.getElementById(keyElement).value = 'Private Key Set';
+            document.getElementById(keyElement).value = 'Key Set';
             document.getElementById(keyElement).disabled = true;
           },
           false,
@@ -245,7 +261,7 @@
       const keyElementEnc = `${keyElement}-enc`
 
       document.getElementById(keyElementEnc).value = Base64.encode((ev.clipboardData || window.clipboardData).getData("text"));
-      document.getElementById(keyElement).value = 'Private Key Set';
+      document.getElementById(keyElement).value = 'Key Set';
       document.getElementById(keyElement).disabled = true;
     }
 
@@ -253,80 +269,7 @@
     document.getElementById('jwt-priv-key').addEventListener("paste", pasteEvent);
     document.getElementById('service-priv-key').addEventListener("paste", pasteEvent);
 
-    /*
-      WS support
-    */
-    /*
-    function intiializeHooksReceiverWS() {
-      console.log("Attempting intiializeHooksReceiverWS Connection...");
-      if (window.location.protocol.includes("https")) {
-          console.log("Attempting wss..");
-          hooksReceiveSocket = new WebSocket("wss://" + location.host + "/hooks/inline/ws");
-      } else {
-          hooksReceiveSocket = new WebSocket("ws://" + location.host + "/hooks/inline/ws");
-      }
-     
-      hooksReceiveSocket.onopen = () => {
-          console.log("Successfully Connected intiializeHooksReceiverWS()");
-          hooksReceiveWsPing();
-      };
-
-      hooksReceiveSocket.onmessage = hooksReceiveOnMessage;
-      hooksReceiveSocket.onclose = hooksReceiveOnClose;
-      hooksReceiveSocket.onerror = hooksReceiveOnError;
-    }
-
-    function hooksReceiveOnMessage(event) {
-      console.log('hooksReceiveOnMessage message received')
-      console.log(event.data);
-      const jsonObj = JSON.parse(event.data);
-      var msg = createMessageReceivedHeader(jsonObj.type);
-      
-      msg += '   ----- Request -----\n';
-      msg += JSON.stringify(jsonObj.request, '', 2)
-      msg += '\n----------------------------------------\n';
-      msg += '   ----- Response -----\n';
-      msg += JSON.stringify(jsonObj.response, '', 2)
-
-      {-{/-* msg += JSON.stringify(jsonObj, '', 2) *-/}-}
-      
-      msg += '\n' + document.getElementById('hooksReceiveMessageArea').value;
-      document.getElementById('hooksReceiveMessageArea').value = msg;
-      document.getElementById('hooksReceiveMessageArea').scrollTo(0, 0);
-    }
-
-    function hooksReceiveOnClose(event) {
-      console.log("hooksReceiveOnClose Socket Closed Connection: ", event);
-      hooksReceiveSocket.send("Client Closed!")
-    }
-
-    function hooksReceiveOnError(error) {
-      console.log("hooksReceiveOnError Socket Error: ", error);
-    }
-
-    function hooksReceiveSendMessage(msg) {
-      hooksReceiveSocket.send(msg);
-    }
-
-    function hooksReceiveWsPing() {
-      if (!hooksReceiveSocket) return;
-      if (hooksReceiveSocket.readyState !== 1) return;
-      hooksReceiveSendMessage('{"uuid": "ping"}');
-      setTimeout(hooksReceiveWsPing, 10000);
-    }
-
-
-    /-*
-      Helpers
-    *-/
-    function createMessageReceivedHeader(hookType) {
-      return `
--------------------------------------------------------------------
-              Received ${hookType}                          
--------------------------------------------------------------------
-`
-    }
-    */
+   
     function saveDpopJwtConfig(event) {
       //console.log(event);
       const activeTab = document.querySelector(".nav-link.active");
@@ -361,6 +304,38 @@
         console.log(err);
         alert('Failed to load content from: \nError: ' + err);
       });
+    }
+
+    function removeKey(whichKey) {
+       fetch(`${location.origin}/dpop/removekey?type=${whichKey}`)
+        .then(response => {
+          if (!response.ok) {
+            alert('Failed to remove key.\nStatus: ' + response.statusText);
+            return;
+          }
+          if (whichKey === 'private') {
+            // Private Key (assertion)
+            document.getElementById('priv-key-button-div').style.display = "none";
+            document.getElementById('service-key-button-div').style.display = "none";
+            document.getElementById('jwt-priv-key').value = '';
+            document.getElementById('service-priv-key').value = '';
+            document.getElementById('jwt-priv-key').disabled = false;
+            document.getElementById('service-priv-key').disabled = false;
+            document.getElementById('jwt-priv-key-enc').value = '';
+            document.getElementById('jwt-priv-key-id').value = '';
+            document.getElementById('service-priv-key-id').value = '';
+          } else {
+            // DPoP Key
+            document.getElementById('dpop-key-button-div').style.display = "none";
+            document.getElementById('service-dpop-key').value = '';
+            document.getElementById('service-dpop-key').disabled = false;
+            document.getElementById('service-dpop-key-enc').value = '';
+          }
+        })
+        .catch( err => {
+          console.log(err);
+          alert('Failed to remove key. \nError: ' + err);
+        });
     }
 
     function resultHeader() {

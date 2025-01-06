@@ -80,6 +80,7 @@ func StartServer(c *utils.Configuration) {
 		1. here
 		2. web/webHandlers.go
 		3. web/proxyHandler.go
+		4. web/scimHandlers.go
 	*/
 	// SCIM Server Handlers
 	if config.Services.Scim {
@@ -138,11 +139,12 @@ func StartServer(c *utils.Configuration) {
 		http.HandleFunc("/dpop/callback", utils.AddMiddleware(handlers.HandleCallbackReq, utils.Config.CommonScimMiddlewares...))
 		http.HandleFunc("/dpop/generate_dpop", utils.AddMiddleware(handlers.HandleGenerateDpop, utils.Config.CommonScimMiddlewares...))
 		http.HandleFunc("/dpop", utils.AddMiddleware(handlers.HandleDpop, utils.Config.CommonScimMiddlewares...))
-		http.HandleFunc("/dpop/upload_priv_key", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
-		http.HandleFunc("/dpop/upload_dpop_key", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
+		// http.HandleFunc("/dpop/upload_priv_key", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
+		// http.HandleFunc("/dpop/upload_dpop_key", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
 		http.HandleFunc("/dpop/jwt-config", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
 		http.HandleFunc("/dpop/service-config", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
 		http.HandleFunc("/dpop/auth-config", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
+		http.HandleFunc("/dpop/removekey", utils.AddMiddleware(handlers.HandleDpopKeyRemoval, utils.Config.CommonScimMiddlewares...))
 	}
 
 	// // Show Authorize page for unauthorized IP
