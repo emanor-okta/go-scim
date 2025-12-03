@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -42,6 +43,8 @@ var wsClientConnected bool
 var oauthConfig types.OauthConfig
 var tpl *template.Template
 var sessionsMap map[string]ssf.SsfReceiverAppData
+
+var publicKey, privateKey jwk.Key
 
 func init() {
 	// hardcode for now
@@ -449,42 +452,81 @@ zqGmfDaixMZoQYf0amSb9Oth
 }
 
 func handleSSFTransmitterConfig(res http.ResponseWriter, _ *http.Request) {
-	// hardcode for now
-	// /ssf/transmitter/
+	// /ssf/transmitter/.well-known/sse-configuration
 	log.Printf("Returning handleSSFTransmitterConfig")
-	hardeCoded := `
+	transmitterConfig := fmt.Sprintf(`
 {
-    "issuer": "https://gw.oktamanor.net",
-    "jwks_uri": "https://gw.oktamanor.net:8443/ssf/transmitter/keys",
+    "issuer": "%s",
+    "jwks_uri": "%s",
     "delivery_methods_supported": [
         "urn:ietf:rfc:8935",
         "https://schemas.openid.net/secevent/risc/delivery-method/push"
     ],
-    "configuration_endpoint": "https://gw.oktamanor.net:8443/ssf/transmitter/stream"
+    "configuration_endpoint": "%s"
 }
-	`
+	`, utils.Config.Ssf.Transmitter_config.Issuer, utils.Config.Ssf.Transmitter_config.Jwks_uri, utils.Config.Ssf.Transmitter_config.Configuration_endpoint)
 	res.Header().Add("content-type", "application/json")
-	res.Write([]byte(hardeCoded))
+	res.Write([]byte(transmitterConfig))
 }
 
 func handleSSFTransmitterKeys(res http.ResponseWriter, _ *http.Request) {
-	// hardcode for now
-	// /ssf/transmitter/
+	// Generate keyset for signing if nil (*Okta should query keys endpoint if a Security Token is received for a key it does not have)
+	// /ssf/transmitter/keys
 	log.Printf("Returning handleSSFTransmitterKeys")
-	hardeCoded := `
-{
-	"keys": [
-		{
-			"kid": "ssfTransmitterKey",
-			"kty": "RSA",
-			"e": "AQAB",
-			"use": "sig",
-			"n": "n1R11WgM0ngtgtW2bHOfSX6KsGrFTieo1UnQzQK0zDcxnqiOXAb4a7lbaehulfxxmFyaR3EFd1lCgQ1HucfASyRRbxLi0ibtlQTnxwQPnLEhdEi36qeGLnSduSEDUfJHf9-f5Qs38T5gQKM7-qtbF1GJpuYI_m3CTuta1re_pzEIuVE3qDxgoPAZlvx1GhEGJHv4Bf8lWzkpi1jy3kwXROSb1xSX-enhizSTVO63p4PmRPf1T8I4x-UgyEtd_J8NYhM38GCojrP64Bjhsvf3K7AWjS2UPa0F6YMIyrU2H0QS_OpwuPmBA4gkjpqWc6hzsiQhEdt0Jc7b9L1yUS3faw"
+	if publicKey == nil {
+		var err error
+		privateKey, publicKey, err = utils.GenerateKey()
+		if err != nil {
+			log.Printf("handleSSFTransmitterKeys: Error Generating Keys, %+v\n", err)
+			res.WriteHeader(http.StatusInternalServerError)
+			return
 		}
-	]
-}
+
+		uuid := utils.GenerateUUID()
+		privateKey.Set("kid", uuid)
+		publicKey.Set("kid", uuid)
+		publicKey.Set("use", "sig")
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(publicKey)
+	if err != nil {
+		log.Printf("handleSSFTransmitterKeys: Error Encoding Key, %+v\n", err)
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	// fmt.Printf("%s\n\n", buf.String())
+
+	hardeCoded := `
+	{
+		"keys": [
+			{
+				"kid": "ssfTransmitterKey",
+				"kty": "RSA",
+				"e": "AQAB",
+				"use": "sig",
+				"n": "n1R11WgM0ngtgtW2bHOfSX6KsGrFTieo1UnQzQK0zDcxnqiOXAb4a7lbaehulfxxmFyaR3EFd1lCgQ1HucfASyRRbxLi0ibtlQTnxwQPnLEhdEi36qeGLnSduSEDUfJHf9-f5Qs38T5gQKM7-qtbF1GJpuYI_m3CTuta1re_pzEIuVE3qDxgoPAZlvx1GhEGJHv4Bf8lWzkpi1jy3kwXROSb1xSX-enhizSTVO63p4PmRPf1T8I4x-UgyEtd_J8NYhM38GCojrP64Bjhsvf3K7AWjS2UPa0F6YMIyrU2H0QS_OpwuPmBA4gkjpqWc6hzsiQhEdt0Jc7b9L1yUS3faw"
+			},
+			{
+				"kty": "RSA",
+				"e": "AQAB",
+				"use": "sig",
+				"kid": "ssfTransmitterKeyNew",
+				"n": "qDeXAi-rEpSGyDD59pvAXtFsxMEPeoz2VRz2TdXV8cAWsoUZilv7k8zocjHPuXOrzOCOKqbYivqnwfO8dE6xqutcYiW_WIFVzoMwPm7XE0Mj_jJpaaaNJnMRxzpM-dOOnLjjNW5xZ-Af8NbQl5OkSeNOYLYprwFx7QirbXfcEeNsAdGz4-r_in_Tzp_ZRktxUtL1eYrIpOTTTnDfP2DSBCi5oQ-xdCQMDpDJGTDC1v60Bis2Xv31EkbV5is8bcsAoBOqLTdqvVz5mN6N-HGxKSt2bnnI_hpkjBOJ5_F9gUvEAhA0Te8L-6yWJMXU5FqXaLfHpK8mPUBgX4-ZH8ZNgw"
+			}
+		]
+	}
 	`
+	// 	keys := fmt.Sprintf(`
+	// {
+	// 	"keys": [
+	// 		%s
+	// 	]
+	// }
+	// 	`, buf.String())
+
 	res.Header().Add("content-type", "application/json")
+	// res.Write([]byte(keys))
 	res.Write([]byte(hardeCoded))
 }
 

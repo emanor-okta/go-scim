@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/emanor-okta/go-scim/filters"
 	"github.com/emanor-okta/go-scim/server/handlers"
@@ -71,7 +74,7 @@ func StartServer(c *utils.Configuration) {
 
 	// used for logging messages to web console - Always init and add to middleware
 	messageLogs.Init()
-	scimMiddlewares = append(scimMiddlewares, logMessagesMiddleware, logMessageResponseSudoMiddleware)
+	scimMiddlewares = append(scimMiddlewares, logMessagesMiddleware, logMessageResponseSudoMiddleware, authorizeScimRequest)
 
 	c.CommonScimMiddlewares = commonScimMiddlewares
 
@@ -105,6 +108,8 @@ func StartServer(c *utils.Configuration) {
 	// Mock OAuth Server Handlers
 	http.HandleFunc("/mock/oauth2/v1/authorize", utils.AddMiddleware(handleAuthorizeReq, commonScimMiddlewares...))
 	http.HandleFunc("/mock/oauth2/v1/token", utils.AddMiddleware(handleTokenReq, commonScimMiddlewares...))
+	scimBearerTokens = map[string]int64{}
+	//scimBearerTokens["ejjskdfksjdfpjsdnfdsd"] = time.Now().Unix() + 30
 
 	// SSF Receiver/Transmitter Handlers  (no handlers in webHandlers.go)
 	if config.Services.Ssf {
@@ -145,6 +150,7 @@ func StartServer(c *utils.Configuration) {
 		http.HandleFunc("/dpop/service-config", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
 		http.HandleFunc("/dpop/auth-config", utils.AddMiddleware(handlers.HandleDpopKeyUpload, utils.Config.CommonScimMiddlewares...))
 		http.HandleFunc("/dpop/removekey", utils.AddMiddleware(handlers.HandleDpopKeyRemoval, utils.Config.CommonScimMiddlewares...))
+		http.HandleFunc("/dpop/ws", utils.AddMiddleware(handlers.HandleDpopWebSocketUpgrade, utils.Config.CommonScimMiddlewares...))
 	}
 
 	// // Show Authorize page for unauthorized IP
@@ -374,6 +380,8 @@ func handleNotSupported(req *http.Request, res *http.ResponseWriter) {
 /*
  * Mock OAuth Server
  */
+var scimBearerTokens map[string]int64
+
 func handleAuthorizeReq(res http.ResponseWriter, req *http.Request) {
 	log.Printf("Received Mock handle Authorize Request:\n%v\n", req.RequestURI)
 	s := req.URL.Query().Get("state")
@@ -387,24 +395,39 @@ func handleTokenReq(res http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Printf("Error handleTokenReq.ParseForm: %s\n", err)
 	}
-	log.Printf("Received Mock handle Token Request:\n%v\nclient_id: %s, client_secret: %s\n",
-		req.RequestURI, req.Form.Get("client_id"), req.Form.Get("client_secret"))
-	// TEST - dont return new refresh
-	log.Printf("Grant Type: %s\n", req.Form.Get("grant_type"))
+	// log.Printf("Received Mock handle Token Request:\n%v\nclient_id: %s, client_secret: %s\n",
+	// 	req.RequestURI, req.Form.Get("client_id"), req.Form.Get("client_secret"))
+	// log.Printf("Grant Type: %s\n", req.Form.Get("grant_type"))
+	log.Printf("Received Mock handle Token Request: %s\n", req.Form.Encode())
+
+	// generate token
+	randomBytes := make([]byte, 75)
+	_, err = rand.Read(randomBytes)
+	if err != nil {
+		log.Fatalf("Error generating random bytes for Bearer Token: %v\n", err)
+	}
+	bearer := base64.StdEncoding.EncodeToString(randomBytes)
+	// store token, expire it after 5 minutes
+	now := time.Now()
+	expiresIn := now.Unix() + 300
+	scimBearerTokens[bearer] = expiresIn
+
 	var tRes any
 	grantType := req.Form.Get("grant_type")
 	if grantType == "refresh_token" {
 		tRes = struct {
-			Access_token string `json:"access_token"`
-			Token_type   string `json:"token_type"`
-			Expires_in   int    `json:"expires_in"`
-			Scope        string `json:"scope"`
+			Access_token  string `json:"access_token"`
+			Token_type    string `json:"token_type"`
+			Expires_in    int    `json:"expires_in"`
+			Scope         string `json:"scope"`
+			Refresh_token string `json:"refresh_token"`
 		}{
-			"eyJhbCI6IkhTMjU2IiwidHlwIjoiSlciLCJhbGciOiJIUzI1NiJ9.eyJzIjoiMTIzNDU2Nzg5MCIsIm4iOiJKb2huIERvZSIsImkiOjE1MTYyMzkwMjJ9.fdErMOJ0QvrD9_vnj2Ih6trMx9cyDsY-mLntzjPFpOg",
+			bearer,
 			// "abcde",
 			"Bearer",
-			600,
-			"scim",
+			300,
+			"scim offline_access",
+			fmt.Sprintf("%s.%s", "mockRefreshTokenValue", bearer),
 		}
 	} else {
 		//
@@ -416,14 +439,14 @@ func handleTokenReq(res http.ResponseWriter, req *http.Request) {
 			Scope         string `json:"scope"`
 			Refresh_token string `json:"refresh_token"`
 		}{
-			"eyJhbCI6IkhTMjU2IiwidHlwIjoiSlciLCJhbGciOiJIUzI1NiJ9.eyJzIjoiMTIzNDU2Nzg5MCIsIm4iOiJKb2huIERvZSIsImkiOjE1MTYyMzkwMjJ9.fdErMOJ0QvrD9_vnj2Ih6trMx9cyDsY-mLntzjPFpOg",
-			// "abcde",
+			bearer,
 			"Bearer",
-			600,
+			300,
 			"scim offline_access",
-			"mock_refresh_token_value",
+			fmt.Sprintf("%s.%s", "mockRefreshTokenValue", bearer),
 		}
 	}
+	fmt.Printf("  Adding Bearer Token to SCIM Server: %s, for grant_type:%s\n", bearer, grantType)
 	res.Header().Add("Content-Type", "application/json")
 	b, _ := json.Marshal(tRes)
 	res.Write(b)

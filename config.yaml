@@ -5,14 +5,14 @@ services:
     hooks: true
     dpop: true
 redis:
-    address: localhost:6379
-    # address: redis-scim:6379
+    # address: localhost:6379
+    address: redis-scim:6379
     password: ""
     db: 0
 server:
     address: ":8082"
-    public_address: "http://localhost:8082"
-    # public_address: "https://gw.oktamanor.net:8443"
+    # public_address: "http://localhost:8082"
+    public_address: "https://gw.oktamanor.net:8443"
     web_address: ":8080"
     web_console: true
     debug_headers: false
@@ -34,5 +34,9 @@ scim:
     enable_groups: true
     users_endpoint: "/goscim/scim/v2/Users"
     groups_endpoint: "/goscim/scim/v2/Groups"
-# build: "v1.22.001"
-build: "v1.34.010"
+ssf:
+    transmitter_config:
+        issuer: "https://gw.oktamanor.net"
+        jwks_uri: "https://gw.oktamanor.net:8443/ssf/transmitter/keys"
+        configuration_endpoint: "https://gw.oktamanor.net:8443/ssf/transmitter/stream"
+build: "v2.07.000"

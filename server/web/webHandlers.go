@@ -132,6 +132,7 @@ func StartWebServer(c *utils.Configuration, mw []types.Middleware) {
 		http.HandleFunc("/raw/user.json", utils.AddMiddleware(handleRawJSON, commonMiddlewares...))
 		http.HandleFunc("/raw/group.json", utils.AddMiddleware(handleRawJSON, commonMiddlewares...))
 		http.HandleFunc("/entitlements", utils.AddMiddleware(handleEntitlements, commonMiddlewares...))
+		http.HandleFunc("/raw/rootCA.crt", utils.AddMiddleware(handleRawJSON, commonMiddlewares...))
 	}
 	if c.Services.Proxy {
 		http.HandleFunc("/proxy", utils.AddMiddleware(handleProxyMessages, commonMiddlewares...))
@@ -497,6 +498,12 @@ func handleJavascript(res http.ResponseWriter, req *http.Request) {
 }
 
 func handleRawJSON(res http.ResponseWriter, req *http.Request) {
+	if req.URL.Path == "/raw/rootCA.crt" {
+		// remove later
+		res.Header().Set("Content-Type", "application/octet-stream")
+		http.ServeFile(res, req, fmt.Sprintf("server/web%s", req.URL.Path))
+		return
+	}
 	res.Header().Set("Content-Type", "application/json")
 
 	// var fp string

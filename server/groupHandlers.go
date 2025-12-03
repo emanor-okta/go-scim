@@ -110,6 +110,10 @@ func handleGroups(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// test map
+// var putMap = make(map[string]string, 0)
+// end test map
+
 // {GET/PUT/PATCH/DELETE} /goscim/scim/v2/Groups/<id>
 func handleGroup(res http.ResponseWriter, req *http.Request) {
 	// if didRedirect(&res, req) {
@@ -126,6 +130,22 @@ func handleGroup(res http.ResponseWriter, req *http.Request) {
 	}
 	uuid := parts[4]
 	path := fmt.Sprintf("/goscim/scim/v2/Groups/%s", uuid)
+
+	// if req.Method == http.MethodGet {
+	// 	// if _, ok := putMap[uuid]; ok {
+	// 	// 	//if uuid != "b415418d-5a3f-48c4-88f9-5803839cfbd0" {
+	// 	// 	delete(putMap, uuid)
+	// 	// 	res.Header().Add("Retry-After", "1")
+	// 	// 	res.WriteHeader(http.StatusTooManyRequests)
+	// 	// 	return
+	// 	// }
+	// 	// putMap[uuid] = uuid
+	// } else if req.Method == http.MethodPut {
+	// 	//putMap[uuid] = uuid
+	// 	res.Header().Add("Retry-After", "1")
+	// 	res.WriteHeader(http.StatusTooManyRequests)
+	// 	return
+	// }
 
 	if req.Method == http.MethodDelete {
 		// DELETE

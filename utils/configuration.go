@@ -108,6 +108,13 @@ type Configuration struct {
 			Redirect_uri string
 		}
 	}
+	Ssf struct {
+		Transmitter_config struct {
+			Issuer,
+			Jwks_uri,
+			Configuration_endpoint string
+		}
+	}
 	Scim struct {
 		Enable_groups     bool
 		ServerBaseAddress string

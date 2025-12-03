@@ -85,14 +85,14 @@
                     <label for="service-scopes" class="col-form-label">Scopes:</label>
                     <input type="text" name="scopes" class="form-control" id="service-scopes" placeholder="<required>" {{if .Dpop.Scopes}}value="{{.Dpop.Scopes}}"{{end}}>
                     <hr/>
-                    <label for="service-client-secret" class="col-form-label">Client secret:</label>
-                    <input type="text" name="client-secret" class="form-control" id="service-client-secret" placeholder="<optional>" {{if .Dpop.ClientSecret}}value="{{.Dpop.ClientSecret}}"{{end}}>
+                    <!--label for="service-client-secret" class="col-form-label">Client secret:</label>
+                    <input type="text" name="client-secret" class="form-control" id="service-client-secret" placeholder="<optional>" {{if .Dpop.ClientSecret}}value="{{.Dpop.ClientSecret}}"{{end}}-->
                     
                     <div >
                       <label for="service-priv-key" class="col-form-label">Private key:</label>
                       <div class="row justify-content-center align-items-center">
                         <div class="col">
-                          <input type="text" name="priv-key" class="form-control" id="service-priv-key" placeholder="<optional>" ondrop="drop(event)" ondragover="dragOverHandler(event);" {{if .Dpop.AssertPem}}value="Key Set" disabled="true"{{end}}>
+                          <input type="text" name="priv-key" class="form-control" id="service-priv-key" placeholder="<required>" ondrop="drop(event)" ondragover="dragOverHandler(event);" {{if .Dpop.AssertPem}}value="Key Set" disabled="true"{{end}}>
                         </div>
                         {{if .Dpop.AssertPem}}
                         <div id="service-key-button-div" class="col-md-auto">
@@ -341,6 +341,64 @@
     function resultHeader() {
       return '          ----------  RESULT ----------\n\n'
     } 
+
+
+    /*
+      WS support
+    */
+    var dpopReceiveSocket;
+    intiializeDpopWS();
+
+    function intiializeDpopWS() {
+      console.log("Attempting intiializeDpopWS Connection...");
+      if (window.location.protocol.includes("https")) {
+          console.log("Attempting wss..");
+          dpopReceiveSocket = new WebSocket("wss://" + location.host + "/dpop/ws");
+      } else {
+          dpopReceiveSocket = new WebSocket("ws://" + location.host + "/dpop/ws");
+      }
+     
+      dpopReceiveSocket.onopen = () => {
+          console.log("Successfully Connected intiializeDpopWS()");
+          dpopWsPing();
+      };
+
+      dpopReceiveSocket.onmessage = dpopOnMessage;
+      dpopReceiveSocket.onclose = dpopOnClose;
+      dpopReceiveSocket.onerror = dpopOnError;
+    }
+
+    function dpopOnMessage(event) {
+      console.log('intiializeDpopWS message received')
+      console.log(event.data);
+      //const jsonObj = JSON.parse(event.data);
+      var msg = resultHeader();
+      //msg += JSON.stringify(jsonObj, '', 2)
+      //msg += '\n' + document.getElementById('debugArea').value;
+      msg += event.data;
+      document.getElementById('debugArea').value = msg;
+      document.getElementById('debugArea').scrollTo(0, 0);
+    }
+
+    function dpopOnClose(event) {
+      console.log("intiializeDpopWS Socket Closed Connection: ", event);
+      dpopReceiveSocket.send("Client Closed!")
+    }
+
+    function dpopOnError(error) {
+      console.log("intiializeDpopWS Socket Error: ", error);
+    }
+
+    function dpopSendMessage(msg) {
+      dpopReceiveSocket.send(msg);
+    }
+
+    function dpopWsPing() {
+      if (!dpopReceiveSocket) return;
+      if (dpopReceiveSocket.readyState !== 1) return;
+      dpopSendMessage('{"uuid": "ping"}');
+      setTimeout(dpopWsPing, 10000);
+    }
 
 </script>
 

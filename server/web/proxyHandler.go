@@ -251,12 +251,21 @@ func modifyResponseImpl(res *http.Response) error {
 
 // http handlers
 func handleProxy(res http.ResponseWriter, req *http.Request) {
-	// TODO - change based off of port binding - hack for now
+	//TEST
+	fmt.Printf("%+v\n", req)
+	if req.Method == http.MethodConnect {
+		res.WriteHeader(http.StatusOK)
+		return
+	}
+	// END TEST
+
 	if !strings.Contains(req.Host, "localhost") &&
 		// !strings.Contains(req.Host, "gw.oktamanor.net") &&
 		!strings.Contains(req.Host, publicAddress) &&
 		!strings.Contains(req.Host, "okta.com") &&
 		!strings.Contains(req.Host, "oktapreview.com") {
+		fmt.Printf("%s\n", req.RequestURI)
+		fmt.Printf("%+v\n", req)
 		apps.HandleApprouting(res, req, strings.Split(req.Host, ".")[0])
 		return
 	}
@@ -267,6 +276,28 @@ func handleProxy(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(int(http.StatusServiceUnavailable))
 		return
 	}
+
+	// if req.RequestURI == "/.well-known/apple-app-site-association" {
+	// 	hardeCoded := `
+	// 	{
+	// 		"authsrv": {
+	// 			"apps": [
+	// 				"B7F62B65BN.com.okta.mobile",
+	// 				"B7F62B65BN.com.okta.mobile.auth-service-extension",
+	// 				"B7F62B65BN.com.okta.authenticator.beta",
+	// 				"B7F62B65BN.com.okta.authenticator.beta.auth-service-extension",
+	// 				"7WXXBW6Z2Y.com.okta.mobile.internalrelease",
+	// 				"7WXXBW6Z2Y.com.okta.mobile.internalrelease.auth-service-extension",
+	// 				"MYAPP.net.oktamanor.okta",
+	// 				"MYAPP.net.oktamanor.okta.auth-service-extension"
+	// 			]
+	// 		}
+	// 	}
+	// 	`
+	// 	res.Header().Add("content-type", "application/json")
+	// 	res.Write([]byte(hardeCoded))
+	// 	return
+	// }
 
 	now := time.Now()
 	//Headers
@@ -294,32 +325,37 @@ func handleProxy(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		if len(b) > 1 {
-			// fmt.Printf("byte length: %v, Content-Length: %v\n", len(b), req.ContentLength)
-			buf := bytes.Buffer{}
-			if err := json.Indent(&buf, b, "", "   "); err != nil {
-				log.Printf("handleProxy() - Error Formatting JSON: %s\n%s\n", err, string(b))
-				m.RequestBody = string(b)
-			} else {
-				// TODO - might base this off of http header content-type
-				contentType = "json"
-				m.RequestBody = buf.String()
-			}
-
-			// Should this message be filtered
-			if filterRequestMessage(req) {
-				var newBytes []byte
-				// h, newBytes = (*config.ReqFilter).(*filters.ManualFilter).FilterRequest(h, []byte(m.RequestBody), fmt.Sprintf("%s Request For: %s", req.Method, req.RequestURI), contentType)
-				h, newBytes = (*config.ReqFilter).FilterRequest(h, []byte(m.RequestBody), fmt.Sprintf("%s Request For: %s", req.Method, req.RequestURI), contentType)
-				req.Body = io.NopCloser(bytes.NewBuffer(newBytes))
-				if req.ContentLength > 0 {
-					req.ContentLength = int64(len(newBytes))
-				}
-				// res.Header.Add("Set-Cookie", "MyCookie=4B89AC; Path=/; Secure; HttpOnly")
-			} else {
-				req.Body = io.NopCloser(bytes.NewBuffer(b))
-			}
+		// hack no body then set to empty JSON (could cause other issue)
+		if len(b) < 1 {
+			b = []byte{0x7B, 0x7D}
 		}
+
+		// if len(b) > 1 {
+		// fmt.Printf("byte length: %v, Content-Length: %v\n", len(b), req.ContentLength)
+		buf := bytes.Buffer{}
+		if err := json.Indent(&buf, b, "", "   "); err != nil {
+			log.Printf("handleProxy() - Error Formatting JSON: %s\n%s\n", err, string(b))
+			m.RequestBody = string(b)
+		} else {
+			// TODO - might base this off of http header content-type
+			contentType = "json"
+			m.RequestBody = buf.String()
+		}
+
+		// Should this message be filtered
+		if filterRequestMessage(req) {
+			var newBytes []byte
+			// h, newBytes = (*config.ReqFilter).(*filters.ManualFilter).FilterRequest(h, []byte(m.RequestBody), fmt.Sprintf("%s Request For: %s", req.Method, req.RequestURI), contentType)
+			h, newBytes = (*config.ReqFilter).FilterRequest(h, []byte(m.RequestBody), fmt.Sprintf("%s Request For: %s", req.Method, req.RequestURI), contentType)
+			req.Body = io.NopCloser(bytes.NewBuffer(newBytes))
+			if req.ContentLength > 0 {
+				req.ContentLength = int64(len(newBytes))
+			}
+			// res.Header.Add("Set-Cookie", "MyCookie=4B89AC; Path=/; Secure; HttpOnly")
+		} else {
+			req.Body = io.NopCloser(bytes.NewBuffer(b))
+		}
+		// }
 	} else if req.Method == http.MethodGet || req.Method == http.MethodOptions || req.Method == http.MethodDelete {
 		if filterRequestMessage(req) {
 			// h, _ = (*config.ReqFilter).(*filters.ManualFilter).FilterRequest(h, []byte{}, fmt.Sprintf("%s Request to: %s", req.Method, req.RequestURI), "")

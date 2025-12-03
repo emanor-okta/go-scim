@@ -3,6 +3,8 @@ package utils
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -330,6 +332,31 @@ func VerifyJwt(jwtBytes []byte, key jwk.Key, alg jwa.KeyAlgorithm) bool {
 }
 
 /*
+JWK Utils
+*/
+func GenerateKey() (jwk.Key, jwk.Key, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		log.Printf("\nError, Generating RSA Private Key: %v\n", err)
+		return nil, nil, fmt.Errorf("error generating RSA private key: %v", err)
+	}
+
+	jwkKey, err := jwk.FromRaw(privateKey)
+	if err != nil {
+		log.Printf("\nError, Generating JWK Key from RSA Private Key: %v\n", err)
+		return nil, nil, fmt.Errorf("error generating JWK key from  RSA private key: %v", err)
+	}
+
+	pubKey, err := jwkKey.PublicKey()
+	if err != nil {
+		log.Printf("\nError, Getting Public Key Part from JWK: %v\n", err)
+		return nil, nil, fmt.Errorf("error getting public key part from JWK: %v", err)
+	}
+
+	return jwkKey, pubKey, nil
+}
+
+/*
 WS Utils
 */
 func HandleWebSocketUpgrade(res http.ResponseWriter, req *http.Request, wsClientConnected *bool) *websocket.Conn {
@@ -368,7 +395,7 @@ func WsPingOnlyReader(wsConn *websocket.Conn, wsClientConnected *bool) {
 		if err != nil {
 			log.Printf("handle wsConn.ReadJSON error: %v\n", err)
 			if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Println("handleSSFReciever wsConn.ReadJSON Client Disconnected")
+				log.Println("WsPingOnlyReader wsConn.ReadJSON Client Disconnected")
 				*wsClientConnected = false
 				return
 			}
@@ -392,7 +419,7 @@ func LoadScimEntitlements() {
 		if err == nil {
 			Config.Entitlements.Resources = make(map[string][]byte)
 			for k, v := range results {
-				Config.Entitlements.Resources[k] = []byte(v)
+				Config.Entitlements.Resources[strings.ToLower(k)] = []byte(v)
 			}
 		}
 

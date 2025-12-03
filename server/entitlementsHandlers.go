@@ -39,7 +39,7 @@ func handleResourceType(res http.ResponseWriter, req *http.Request) {
 	res.Header().Add("content-type", content_type)
 	loadEntitlements()
 	paths := strings.Split(strings.Split(req.RequestURI, "?")[0], "/")
-	resource := paths[len(paths)-1]
+	resource := strings.ToLower(paths[len(paths)-1])
 	if req.Method == http.MethodPut {
 		// UPDATE existing resource or add it
 		body, err := getBody(req)

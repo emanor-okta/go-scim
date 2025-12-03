@@ -38,11 +38,11 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 
 		if q.filter.userName != "" {
 			// TEST
-			if strings.Contains(q.filter.userName, "igor") {
-				// return unauthorized
-				res.WriteHeader(http.StatusUnauthorized)
-				return
-			}
+			// if strings.Contains(q.filter.userName, "igor") {
+			// 	// return unauthorized
+			// 	res.WriteHeader(http.StatusUnauthorized)
+			// 	return
+			// }
 			// END TEST
 			// ?filter=username eq <username>
 			path = fmt.Sprintf("%s?filter=username eq %s&startIndex=%v&count=%v", path, q.filter.userName, q.startIndex, q.count)
@@ -117,6 +117,7 @@ func handleUsers(res http.ResponseWriter, req *http.Request) {
 
 		res.WriteHeader(http.StatusCreated)
 		if _, err = res.Write(doc); err != nil {
+			// if _, err = res.Write(nil); err != nil { // test not returning user record
 			log.Printf("Error returning AddUser call: %v\b", err)
 		}
 	} else {

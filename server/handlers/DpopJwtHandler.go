@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -19,6 +17,8 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jws"
+
+	"github.com/gorilla/websocket"
 
 	"github.com/emanor-okta/go-scim/utils"
 )
@@ -257,27 +257,27 @@ func generateAth(accessToken string) string {
 	return ath
 }
 
-func generateKey() (jwk.Key, jwk.Key, error) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		log.Printf("\nError, Generating RSA Private Key: %v\n", err)
-		return nil, nil, fmt.Errorf("error generating RSA private key: %v", err)
-	}
+// func generateKey() (jwk.Key, jwk.Key, error) {
+// 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+// 	if err != nil {
+// 		log.Printf("\nError, Generating RSA Private Key: %v\n", err)
+// 		return nil, nil, fmt.Errorf("error generating RSA private key: %v", err)
+// 	}
 
-	jwkKey, err := jwk.FromRaw(privateKey)
-	if err != nil {
-		log.Printf("\nError, Generating JWK Key from RSA Private Key: %v\n", err)
-		return nil, nil, fmt.Errorf("error generating JWK key from  RSA private key: %v", err)
-	}
+// 	jwkKey, err := jwk.FromRaw(privateKey)
+// 	if err != nil {
+// 		log.Printf("\nError, Generating JWK Key from RSA Private Key: %v\n", err)
+// 		return nil, nil, fmt.Errorf("error generating JWK key from  RSA private key: %v", err)
+// 	}
 
-	pubKey, err := jwkKey.PublicKey()
-	if err != nil {
-		log.Printf("\nError, Getting Public Key Part from JWK: %v\n", err)
-		return nil, nil, fmt.Errorf("error getting public key part from JWK: %v", err)
-	}
+// 	pubKey, err := jwkKey.PublicKey()
+// 	if err != nil {
+// 		log.Printf("\nError, Getting Public Key Part from JWK: %v\n", err)
+// 		return nil, nil, fmt.Errorf("error getting public key part from JWK: %v", err)
+// 	}
 
-	return jwkKey, pubKey, nil
-}
+// 	return jwkKey, pubKey, nil
+// }
 
 func getKeys(keyAsPem []byte) (jwk.Key, jwk.Key, error) {
 	privkey, err := jwk.ParseKey(keyAsPem, jwk.WithPEM(true))
@@ -416,12 +416,14 @@ func httpRequest(method, url, contentType, authorization, dpop string, payload *
 
 func getOrGenerateDpopKey(keyAsPemFile string) (jwk.Key, jwk.Key, error) {
 	if keyAsPemFile == "" {
-		return generateKey()
+		// return generateKey()
+		return utils.GenerateKey()
 	} else {
 		pem, err := os.ReadFile(keyAsPemFile)
 		if err != nil {
 			log.Printf("\nError, Reading Key file for DPoP, generating a key instead, %+v\n", err)
-			return generateKey()
+			// return generateKey()
+			return utils.GenerateKey()
 		}
 		return getKeys(pem)
 	}
@@ -483,6 +485,7 @@ func HandleCallbackReq(res http.ResponseWriter, req *http.Request) {
 	}
 
 	res.Write([]byte(values))
+	sendToDpopUI([]byte(strings.TrimSpace(debug)))
 }
 
 func HandleGenerateDpop(res http.ResponseWriter, req *http.Request) {
@@ -497,12 +500,19 @@ func HandleGenerateDpop(res http.ResponseWriter, req *http.Request) {
 	// m := map[string]string{"result": result}
 	// b, _ := json.Marshal(m)
 	res.Write([]byte(result))
+	sendToDpopUI([]byte(strings.TrimSpace(debug)))
 }
 
 func HandleDpop(res http.ResponseWriter, req *http.Request) {
 	// dpop := generateDpop()
 	// res.Write([]byte(dpop))
 	// fmt.Printf("%+v\n", utils.Config.Dpop)
+
+	// make sure one of the tabs is selected
+	if utils.Config.Dpop.FlowType == "" {
+		utils.Config.Dpop.FlowType = "jwt"
+	}
+
 	err := tpl.ExecuteTemplate(res, "dpopjwt.gohtml", struct {
 		utils.Services
 		utils.Dpop
@@ -591,126 +601,27 @@ func HandleDpopKeyRemoval(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusOK)
 }
 
-// func HandleDpopKeyUpload2(res http.ResponseWriter, req *http.Request) {
-// 	//bytes, err := utils.GetBody(req)
-// 	err := req.ParseMultipartForm(4096 * 4)
-// 	if err != nil {
-// 		log.Printf("HandleDpopKeyUpload: Error ParseMultipartForm, %s\n", err)
-// 		res.WriteHeader(http.StatusBadRequest)
-// 		return
-// 	}
-// 	fmt.Printf("%+v\n", req.MultipartForm)
-// 	file, fileHeader, err := req.FormFile("priv_key")
-// 	if err != nil {
-// 		log.Printf("HandleDpopKeyUpload: Error FormFile, %s\n", err)
-// 		res.WriteHeader(http.StatusBadRequest)
-// 		return
-// 	}
-// 	bytes := make([]byte, 4096*4)
-// 	read, err := file.Read(bytes)
-// 	fmt.Printf("file name: %s\n%v\n", fileHeader.Filename, read)
-// 	if err != nil || read < 1 {
-// 		log.Printf("HandleDpopKeyUpload: Error Read, %s\n", err)
-// 		res.WriteHeader(http.StatusBadRequest)
-// 		return
-// 	}
-// 	fmt.Printf("file name: %s\n%s\n", fileHeader.Filename, string(bytes))
-// 	if strings.Contains(req.RequestURI, "upload_priv_key") {
-// 		utils.Config.Dpop.AssertPem = string(bytes)
-// 	} else {
-// 		utils.Config.Dpop.DpopPem = string(bytes)
-// 	}
-// 	fmt.Println(utils.Config.Dpop.AssertPem)
-// 	res.WriteHeader(http.StatusAccepted)
-// }
+/*
+ * WS Support
+ */
+var dpopWsClientConnected bool
+var dpopWsConn *websocket.Conn
 
-// func parseCommandLineArgs() utils.Dpop {
+func HandleDpopWebSocketUpgrade(res http.ResponseWriter, req *http.Request) {
+	dpopWsConn = utils.HandleWebSocketUpgrade(res, req, &dpopWsClientConnected)
+	if dpopWsClientConnected && dpopWsConn != nil {
+		go utils.WsPingOnlyReader(dpopWsConn, &dpopWsClientConnected)
+	}
+}
 
-// 	flowParams := utils.Dpop{}
-// 	if len(os.Args) < 2 {
-// 		showHelp()
-// 	}
-
-// 	switch os.Args[1] {
-// 	case "m2m":
-// 		flowParams.FlowType = "service"
-// 	case "web":
-// 		flowParams.FlowType = "web"
-// 	case "jwt":
-// 		flowParams.FlowType = "jwt"
-// 	default:
-// 		showHelp()
-// 	}
-
-// 	for i := 2; i < len(os.Args); i++ {
-// 		option := os.Args[i]
-// 		if option == "-d" || option == "--debug" {
-// 			flowParams.DebugNet = true
-// 			continue
-// 		}
-// 		i = i + 1
-// 		val := os.Args[i]
-// 		fmt.Printf("option=%s, val=%s\n", option, val)
-
-// 		switch option {
-// 		case "-i", "--issuer":
-// 			flowParams.Issuer = val
-// 		case "-c", "--client-id":
-// 			flowParams.ClientId = val
-// 		case "-x", "--client-secret":
-// 			flowParams.ClientSecret = val
-// 		case "-v", "--code-verifier":
-// 			flowParams.CodeVerifier = val
-// 		case "-s", "--scopes":
-// 			flowParams.Scopes = val
-// 		case "-o", "--dpop-pem-file":
-// 			flowParams.DpopPem = val
-// 		case "-a", "--auth-code":
-// 			flowParams.Code = val
-// 		case "-r", "--redirect-uri":
-// 			flowParams.RedirectURI = val
-// 		case "-p", "--port":
-// 			flowParams.Port = val
-// 		case "-m", "--api-method":
-// 			flowParams.ApiMethod = val
-// 		case "-e", "--api-endpoint":
-// 			flowParams.ApiEndpoint = val
-// 		case "-j", "--jwt-pem-file":
-// 			flowParams.AssertPem = val
-// 		case "-k", "--jwt-kid":
-// 			flowParams.AssertKid = val
-// 		default:
-// 			fmt.Printf("\nError, Invalid command line param supplied: %s\n", val)
-// 		}
-// 	}
-
-// 	return flowParams
-// }
-
-// func showHelp() {
-// 	fmt.Println("\nUsage:")
-// 	fmt.Printf("%-2sgo run main.go [command]\n", "")
-
-// 	fmt.Println("\nAvailable Commands:")
-// 	fmt.Printf("  %-10sAuthorization Code\n", "web")
-// 	fmt.Printf("  %-10sClient Credentials\n", "m2m")
-// 	fmt.Printf("  %-10sGenerate JWT Credential for Oauth for Okta without DPoP\n", "jwt")
-
-// 	fmt.Println("\nFlags:")
-// 	fmt.Printf("  %-3s %-20s Okta Authorization Server\n", "-i,", "--issuer")
-// 	fmt.Printf("  %-3s %-20s OIDC Client id of Okta App\n", "-c,", "--client-id")
-// 	fmt.Printf("  %-3s %-20s OIDC Client Client Secret of Okta App (for web apps)\n", "-x,", "--client-secret")
-// 	fmt.Printf("  %-3s %-20s OAuth Scopes Requested, comma seperated (ie okta.apps.read,okta.groups.manage)\n", "-s,", "--scopes")
-// 	fmt.Printf("  %-3s %-20s OAuth Redirect URI\n", "-r,", "--redirect-uri")
-// 	fmt.Printf("  %-3s %-20s PKCE code Verifier (for flows that use PKVE)\n", "-v,", "--code-verifier")
-// 	fmt.Printf("  %-3s %-20s Authorization Code Value (needed for web flow if not redirecting to 'http://localhost:<port>/callback')\n", "-a,", "--auth-code")
-// 	fmt.Printf("  %-3s %-20s For web flows if redirecting to this process port to run http server on (will start server on 'http://localhost:<port>/callback')\n", "-p,", "--port")
-// 	fmt.Printf("  %-3s %-20s API endpoint the DPoP Access Token will be used for\n", "-e,", "--api-endpoint")
-// 	fmt.Printf("  %-3s %-20s HTTP Method used with the DPoP Access Token (GET/POST/etc)\n", "-m,", "--api-method")
-// 	fmt.Printf("  %-3s %-20s File location with PEM encoded private key to sign JWT (needed for o4o when using m2m)\n", "-j,", "--jwt-pem-file")
-// 	fmt.Printf("  %-3s %-20s Key id of JWK registered in Okta\n", "-k,", "--jwt-key")
-// 	fmt.Printf("  %-3s %-20s File location with PEM encoded private key to sign DPoP (if not specified a JWKS will dynamically be generated)\n", "-o,", "--dpop-pem-file")
-// 	fmt.Printf("  %-3s %-20s Debug Network Requests and Responses\n", "-d,", "--debug")
-// 	fmt.Printf("\n\n")
-// 	os.Exit(0)
-// }
+/*
+Helpers
+*/
+func sendToDpopUI(debugData []byte) {
+	if dpopWsClientConnected {
+		err := dpopWsConn.WriteMessage(websocket.TextMessage, debugData)
+		if err != nil {
+			log.Printf("sendToDpopUI: sendToUI: Error sending WS message: %s\n", err)
+		}
+	}
+}

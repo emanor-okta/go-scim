@@ -153,3 +153,27 @@ func logMessageResponseSudoMiddleware(h http.HandlerFunc) http.HandlerFunc {
 		h.ServeHTTP(lrw, r)
 	})
 }
+
+func authorizeScimRequest(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		headerTokens := strings.Split(r.Header.Get("Authorization"), " ")
+		fmt.Printf(">>> authorizeScimRequest: %+v\n", headerTokens)
+		if len(headerTokens) > 1 && strings.Contains(strings.ToLower(headerTokens[0]), "bearer") {
+			bearer := headerTokens[1]
+			expiresIn, ok := scimBearerTokens[bearer]
+			if ok && expiresIn > time.Now().Unix() {
+				h.ServeHTTP(w, r)
+				return
+			}
+			// return 401, with WWW-Authenticate header, will cause Okta to get new token.
+			delete(scimBearerTokens, bearer)
+			fmt.Printf("  Removing Bearer Token from SCIM Server: %s\n", bearer)
+			w.Header().Add("WWW-Authenticate", `Bearer realm="gw.oktamanor.net", error="invalid_token", error_description="The access token expired"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		} else {
+			// Not bearer token, allow
+			h.ServeHTTP(w, r)
+		}
+	})
+}
