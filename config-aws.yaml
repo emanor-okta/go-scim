@@ -3,7 +3,7 @@ services:
     proxy: true
     ssf: true
     hooks: true
-    dpop: true
+    dpop: false
 redis:
     # address: localhost:6379
     address: redis-scim:6379
@@ -11,8 +11,7 @@ redis:
     db: 0
 server:
     address: ":8082"
-    # public_address: "http://localhost:8082"
-    public_address: "https://gw.oktamanor.net:8443"
+    public_address: "http://localhost:8082"
     web_address: ":8080"
     web_console: true
     debug_headers: false
@@ -24,12 +23,11 @@ server:
     filter_ips: true
     okta_public_ips_url: "https://s3.amazonaws.com/okta-ip-ranges/ip_ranges.json"
     unauthorized_ips_oauth_config:
-        issuer: "https://emanor-oie.oktapreview.com/oauth2/ausgpm3m5e7bePhh21d7"
-        client_id: "0oagpm3efxFP4UXkw1d7"
-        client_secret: "BBfY-vATLN8b7WGZAuPkW9fd2cRLqVe1dFQbCazACmTuBIqx3L0IrHUwzCu5gyRO"
+        issuer: "https://{org}.oktapreview.com/oauth2/default"
+        client_id: "0oa..."
+        client_secret: "BBf..."
         scopes: "openid profile email go_scim"
-        # redirect_uri: "http://localhost:8082/authorizeMyIp/callback"
-        redirect_uri: "https://gw.oktamanor.net:8443/authorizeMyIp/callback"
+        redirect_uri: "http://localhost:8082/authorizeMyIp/callback"
 scim:
     enable_groups: true
     users_endpoint: "/goscim/scim/v2/Users"

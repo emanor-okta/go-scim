@@ -263,7 +263,8 @@ func handleProxy(res http.ResponseWriter, req *http.Request) {
 		// !strings.Contains(req.Host, "gw.oktamanor.net") &&
 		!strings.Contains(req.Host, publicAddress) &&
 		!strings.Contains(req.Host, "okta.com") &&
-		!strings.Contains(req.Host, "oktapreview.com") {
+		!strings.Contains(req.Host, "oktapreview.com") &&
+		!strings.Contains(req.Host, "ngrok-free.dev") {
 		fmt.Printf("%s\n", req.RequestURI)
 		fmt.Printf("%+v\n", req)
 		apps.HandleApprouting(res, req, strings.Split(req.Host, ".")[0])

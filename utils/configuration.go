@@ -153,10 +153,26 @@ type Configuration struct {
 
 func LoadConfig(c string) *Configuration {
 	var config Configuration
-	buf, err := os.ReadFile(c)
+	var buf []byte
+	var err error
+
+	buf, err = os.ReadFile("/goscim-config/config.yaml")
 	if err != nil {
-		log.Fatalf("No Configuration file exists: %v\n", err)
+		log.Printf(err.Error())
+		buf, err = os.ReadFile(c)
+		if err != nil {
+			log.Fatalf("No Configuration file exists: %v\n", err)
+		}
+		log.Println("Using config.yaml")
+		log.Println(string(buf))
+	} else {
+		log.Println("Using /goscim-config/config.yaml")
 	}
+
+	// buf, err = os.ReadFile(c)
+	// if err != nil {
+	// 	log.Fatalf("No Configuration file exists: %v\n", err)
+	// }
 
 	err = yaml.Unmarshal(buf, &config)
 	if err != nil {

@@ -5,7 +5,8 @@
 cd ..
 
 echo "Building go-scim for docker, version v$1"
-docker build --tag docker-go-scim --no-cache go-scim
+# docker build --tag docker-go-scim --no-cache go-scim
+docker buildx build --platform linux/amd64 --tag docker-go-scim --no-cache go-scim
 
 echo "Tagging"
 docker image tag docker-go-scim:latest docker-go-scim:v$1

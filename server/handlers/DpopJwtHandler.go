@@ -580,7 +580,7 @@ func HandleDpopKeyUpload(res http.ResponseWriter, req *http.Request) {
 		case "port":
 			utils.Config.Dpop.Port = v[0]
 		default:
-			log.Printf("HandleDpopKeyUpload: un-used request param: %s - %s\n", k, v[0])
+			log.Printf("HandleDpopKeyUpload: un-used request param : %s - %s\n", k, v[0])
 		}
 	}
 	// fmt.Printf("%+v\n", utils.Config.Dpop)
