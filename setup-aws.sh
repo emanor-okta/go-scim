@@ -34,9 +34,9 @@ echo "--> done.."
 echo ""
 
 echo "Login to ngrok (https://dashboard.ngrok.com/login) and get an API Token"
-echo "Run `ngrok config add-authtoken <token>` to configure ngrok"
+echo -e "Run '\e[32mngrok config add-authtoken <token>\e[0m' to configure ngrok"
 echo ""
-echo "Start ngrok with `ngrok http 8082`"
-echo "Open another terminal window and start docker with `docker-compose up`"
+echo -e "Start ngrok with '\e[32mngrok http 8082\e[0m'"
+echo -e "Open another terminal window and start docker with '\e[32mdocker-compose up\e[0m'"
 
 echo ""
