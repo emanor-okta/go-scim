@@ -27,7 +27,7 @@ wget https://raw.githubusercontent.com/emanor-okta/go-scim/refs/heads/main/confi
 echo "--> Creating Volume setting scripts"
 sudo docker volume create goscim-config
 goscim_config_destination=`docker volume inspect goscim-config | grep Mountpoint | awk -F'"' '{print $4}'`
-sudo cp config.yaml $goscim_config_destination
+sudo cp config-aws.yaml $goscim_config_destination/config.yaml
 echo "alias vigoscim='sudo vi ${goscim_config_destination}/config.yaml'" >> ~/.bash_profile
 
 echo "--> done.."
