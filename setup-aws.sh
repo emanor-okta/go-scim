@@ -22,7 +22,7 @@ sudo tar xvzf ./ngrok-v3-stable-linux-amd64.tgz -C /usr/local/bin
 
 echo "--> Getting Configs"
 wget https://raw.githubusercontent.com/emanor-okta/go-scim/refs/heads/main/docker-compose.yml
-wget https://raw.githubusercontent.com/emanor-okta/go-scim/refs/heads/main/config.yaml
+wget https://raw.githubusercontent.com/emanor-okta/go-scim/refs/heads/main/config-aws.yaml
 
 echo "--> Creating Volume setting scripts"
 sudo docker volume create goscim-config

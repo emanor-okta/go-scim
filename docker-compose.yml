@@ -7,7 +7,7 @@ services:
       - '6379:6379'
     command: redis-server --save 60 1 --loglevel warning
   docker-go-scim:
-    image: erikmanoroktacom/docker-go-scim:v2.10
+    image: erikmanoroktacom/docker-go-scim:v2.11
     ports:
       - 8082:8082
       - 9002:9002

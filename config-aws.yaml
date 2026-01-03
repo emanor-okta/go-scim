@@ -20,7 +20,7 @@ server:
     log_messages: false
     proxy_messages: false
     proxy_address: ":8084"
-    filter_ips: true
+    filter_ips: false
     okta_public_ips_url: "https://s3.amazonaws.com/okta-ip-ranges/ip_ranges.json"
     unauthorized_ips_oauth_config:
         issuer: "https://{org}.oktapreview.com/oauth2/default"
